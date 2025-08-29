@@ -1,0 +1,144 @@
+{
+    "471607979007803392": {
+        "money": 0,
+        "job": "Eodibiti 🏳️‍🌈",
+        "salary": 310,
+        "last_setjob": 1756141097.6215577,
+        "last_work": 1756385122.129987,
+        "last_chuyentien": 1756235900.1905622,
+        "last_baucua": 1756195055.4805484,
+        "last_taixiu": 1756210150.9032536,
+        "jailed_until": 1756213595.9760454,
+        "debt": {
+            "amount": 500,
+            "due_time": 1756249300.9983485
+        },
+        "last_slot": "2025-08-26T11:07:31.795659"
+    },
+    "987318832907567135": {
+        "money": 62,
+        "job": null,
+        "salary": 0,
+        "last_setjob": 0,
+        "last_work": 0,
+        "last_chuyentien": 0
+    },
+    "715579253051359342": {
+        "money": 48,
+        "job": "Wibu 📚",
+        "salary": 194,
+        "last_setjob": 1756141994.9890752,
+        "last_work": 1756142546.5190191,
+        "last_chuyentien": 0,
+        "last_taixiu": 1756142497.514212
+    },
+    "621918844201730049": {
+        "money": 65,
+        "job": null,
+        "salary": 0,
+        "last_setjob": 0,
+        "last_work": 1756142037.5364993,
+        "last_chuyentien": 0
+    },
+    "544878088295677972": {
+        "money": 0,
+        "job": "Thợ Săn Tre Em 🏹",
+        "salary": 224,
+        "last_setjob": 1756142853.6513555,
+        "last_work": 1756218327.2419548,
+        "last_chuyentien": 1756213691.9217007,
+        "last_taixiu": 1756218506.2840245,
+        "jailed_until": 1756218596.2856636,
+        "debt": {
+            "amount": 0,
+            "due_time": 0
+        }
+    },
+    "784321064515141632": {
+        "money": 0,
+        "job": "Nghiên Cứu 🔬",
+        "salary": 40000,
+        "last_setjob": 1756142830.3921824,
+        "last_work": 1756384936.1840944,
+        "last_chuyentien": 1756235944.3842146,
+        "last_taixiu": 1756385163.5715063,
+        "jailed_until": 1756206871.6229334,
+        "last_slot": "2025-08-26T08:00:44.191273"
+    },
+    "559937121696350208": {
+        "money": 900,
+        "job": "Ngư Dân 🎣",
+        "salary": 104,
+        "last_setjob": 1756143382.278036,
+        "last_work": 1756212131.2186146,
+        "last_chuyentien": 0,
+        "last_taixiu": 1756212173.9865246
+    },
+    "124145329598758912": {
+        "money": 126,
+        "job": null,
+        "salary": 0,
+        "last_setjob": 0,
+        "last_work": 1756144370.5830915,
+        "last_chuyentien": 0
+    },
+    "1003289436777365614": {
+        "money": 0,
+        "job": null,
+        "salary": 0,
+        "last_setjob": 0,
+        "last_work": 0,
+        "last_chuyentien": 0
+    },
+    "741516861979492404": {
+        "money": 17566,
+        "job": "Thợ Mỏ Fuba ⛏️",
+        "salary": 106,
+        "last_setjob": 1756144473.7590532,
+        "last_work": 1756214849.859369,
+        "last_chuyentien": 1756207310.5913835,
+        "last_taixiu": 1756207720.8025684,
+        "jailed_until": 1756206663.7080157
+    },
+    "929228634563182622": {
+        "money": 288,
+        "job": "MoiDen 👦🏿",
+        "salary": 262,
+        "last_setjob": 1756144849.657904,
+        "last_work": 1756144892.3608081,
+        "last_chuyentien": 0,
+        "last_taixiu": 1756144642.8596294,
+        "last_baucua": 1756144969.512381
+    },
+    "1360496825034866828": {
+        "money": 0,
+        "job": null,
+        "salary": 0,
+        "last_setjob": 0,
+        "last_work": 0,
+        "last_chuyentien": 0
+    },
+    "362754376328019979": {
+        "money": 188,
+        "job": "Thợ Săn Tre Em 🏹",
+        "salary": 188,
+        "last_setjob": 1756207595.9233863,
+        "last_work": 1756207499.362028,
+        "last_chuyentien": 0,
+        "jailed_until": 1756206928.6152165,
+        "debt": {
+            "amount": 0,
+            "due_time": 0
+        },
+        "last_slot": "2025-08-26T11:20:23.698464",
+        "last_taixiu": 1756207526.288181
+    },
+    "518407271537967104": {
+        "money": 2456,
+        "job": "Nole Tư Bản 🌾",
+        "salary": 498,
+        "last_setjob": 1756212591.8916283,
+        "last_work": 1756212715.5373874,
+        "last_chuyentien": 0
+    }
+}
