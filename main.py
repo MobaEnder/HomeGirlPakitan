@@ -42,6 +42,10 @@ bot.setup_hook = setup_hook
 # -----------------------
 # Run bot
 # -----------------------
-# ⚠️ Token thật thì để trong .env hoặc config.json
-TOKEN = "DISCORD_TOKEN"
+# Lấy token từ biến môi trường Railway
+TOKEN = os.getenv("DISCORD_TOKEN")
+
+if not TOKEN:
+    raise ValueError("❌ Không tìm thấy biến môi trường DISCORD_TOKEN trên Railway!")
+
 bot.run(TOKEN)
