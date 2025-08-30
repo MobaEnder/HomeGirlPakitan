@@ -29,7 +29,6 @@ class JoinView(discord.ui.View):
 
         # Cập nhật embed
         embed = room["message"].embeds[0]
-        # Xóa field cuối rồi thêm lại cho chắc
         if len(embed.fields) > 1:
             embed.remove_field(-1)
 
@@ -42,17 +41,15 @@ class JoinView(discord.ui.View):
         await room["message"].edit(embed=embed, view=self)
         await interaction.response.send_message(f"✅ Bạn đã tham gia phòng **{self.room_id}**!", ephemeral=True)
 
-        # Nếu đủ người thì bắt đầu
         if len(room["players"]) == room["max_players"]:
             await self.cog.start_game(self.room_id)
 
 
 class ChoiceView(discord.ui.View):
-    def __init__(self, cog, room_id, player_id):
+    def __init__(self, cog, room_id):
         super().__init__(timeout=15)
         self.cog = cog
         self.room_id = room_id
-        self.player_id = player_id
 
     @discord.ui.select(
         placeholder="🎲 Chọn số đỏ (0-4)",
@@ -61,12 +58,11 @@ class ChoiceView(discord.ui.View):
     async def select_number(self, interaction: discord.Interaction, select: discord.ui.Select):
         num_red = int(select.values[0])
         num_white = 4 - num_red
-        self.cog.rooms[self.room_id]["players"][self.player_id]["choice"] = (num_red, num_white)
+        self.cog.rooms[self.room_id]["players"][interaction.user.id]["choice"] = (num_red, num_white)
 
         await interaction.response.send_message(
-            f"🥢 Bạn chọn **{num_red} đỏ - {num_white} trắng**", ephemeral=True
+            f"🥢 Bạn đã chọn **{num_red} đỏ - {num_white} trắng**", ephemeral=True
         )
-        self.stop()
 
 
 class XocDia(commands.Cog):
@@ -121,14 +117,8 @@ class XocDia(commands.Cog):
             color=discord.Color.green()
         )
 
-        await msg.edit(embed=embed, view=None)
-
-        # Cho từng người chơi chọn
-        for pid in room["players"].keys():
-            player = msg.guild.get_member(pid)
-            if player:
-                view = ChoiceView(self, room_id, pid)
-                await player.send("🎲 Chọn kết quả bạn dự đoán:", view=view)
+        choice_view = ChoiceView(self, room_id)
+        await msg.edit(embed=embed, view=choice_view)
 
         # Chờ 15s cho mọi người chọn
         await asyncio.sleep(15)
@@ -136,7 +126,7 @@ class XocDia(commands.Cog):
         # Đếm ngược mở bát
         for i in range(5, 0, -1):
             embed.description = f"⏳ Nhà cái sẽ mở bát sau **{i}** giây..."
-            await msg.edit(embed=embed)
+            await msg.edit(embed=embed, view=None)
             await asyncio.sleep(1)
 
         # Mở bát
@@ -165,7 +155,6 @@ class XocDia(commands.Cog):
                 user_data = get_user(DATA, pid)
                 user_data["money"] += reward
                 winners.append((pid, reward))
-
             else:
                 user_data = get_user(DATA, pid)
                 user_data["money"] -= bet
@@ -188,7 +177,6 @@ class XocDia(commands.Cog):
 
         await msg.edit(embed=result_embed, view=None, delete_after=30)
 
-        # Xoá room
         del self.rooms[room_id]
 
 
