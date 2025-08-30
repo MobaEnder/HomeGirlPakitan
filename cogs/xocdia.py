@@ -1,8 +1,10 @@
 import discord
 from discord.ext import commands
 from discord import app_commands
-import asyncio, random
+import random
+import asyncio
 from utils.data import get_user, DATA, save_data
+
 
 class JoinView(discord.ui.View):
     def __init__(self, cog, room_id):
@@ -17,46 +19,54 @@ class JoinView(discord.ui.View):
             return await interaction.response.send_message("❌ Phòng không tồn tại!", ephemeral=True)
 
         if interaction.user.id in room["players"]:
-            return await interaction.response.send_message("❌ Bạn đã tham gia rồi!", ephemeral=True)
+            return await interaction.response.send_message("⚠️ Bạn đã tham gia phòng này rồi!", ephemeral=True)
 
         if len(room["players"]) >= room["max_players"]:
-            return await interaction.response.send_message("❌ Phòng đã đủ người!", ephemeral=True)
+            return await interaction.response.send_message("❌ Phòng đã đầy!", ephemeral=True)
 
-        room["players"][interaction.user.id] = None  # chưa chọn
-        await interaction.response.send_message(f"✅ {interaction.user.mention} đã tham gia!", ephemeral=True)
+        # Thêm người chơi
+        room["players"][interaction.user.id] = {"choice": None}
 
+        # Cập nhật embed
         embed = room["message"].embeds[0]
-        embed.set_field_at(2, name="👥 Người chơi", value="\n".join(f"<@{uid}>" for uid in room["players"].keys()), inline=False)
-        await room["message"].edit(embed=embed, view=self)
+        # Xóa field cuối rồi thêm lại cho chắc
+        if len(embed.fields) > 1:
+            embed.remove_field(-1)
 
-        # nếu đủ người
+        embed.add_field(
+            name="👥 Người chơi",
+            value="\n".join(f"<@{uid}>" for uid in room["players"].keys()),
+            inline=False
+        )
+
+        await room["message"].edit(embed=embed, view=self)
+        await interaction.response.send_message(f"✅ Bạn đã tham gia phòng **{self.room_id}**!", ephemeral=True)
+
+        # Nếu đủ người thì bắt đầu
         if len(room["players"]) == room["max_players"]:
-            await asyncio.sleep(5)
-            await self.cog.start_game(room)
+            await self.cog.start_game(self.room_id)
 
 
 class ChoiceView(discord.ui.View):
-    def __init__(self, cog, room, user_id):
-        super().__init__(timeout=20)
+    def __init__(self, cog, room_id, player_id):
+        super().__init__(timeout=15)
         self.cog = cog
-        self.room = room
-        self.user_id = user_id
+        self.room_id = room_id
+        self.player_id = player_id
 
     @discord.ui.select(
-        placeholder="🎲 Chọn số mặt đỏ (0–4)",
-        options=[discord.SelectOption(label=f"{i} Đỏ - {4-i} Trắng", value=str(i)) for i in range(5)]
+        placeholder="🎲 Chọn số đỏ (0-4)",
+        options=[discord.SelectOption(label=str(i), value=str(i)) for i in range(5)]
     )
-    async def select_choice(self, interaction: discord.Interaction, select: discord.ui.Select):
-        if interaction.user.id != self.user_id:
-            return await interaction.response.send_message("❌ Không phải lượt của bạn!", ephemeral=True)
+    async def select_number(self, interaction: discord.Interaction, select: discord.ui.Select):
+        num_red = int(select.values[0])
+        num_white = 4 - num_red
+        self.cog.rooms[self.room_id]["players"][self.player_id]["choice"] = (num_red, num_white)
 
-        choice = int(select.values[0])
-        self.room["players"][self.user_id] = choice
-        await interaction.response.send_message(f"✅ Bạn đã chọn **{choice} Đỏ – {4-choice} Trắng**", ephemeral=True)
-
-        # kiểm tra tất cả đã chọn
-        if all(v is not None for v in self.room["players"].values()):
-            await self.cog.reveal_result(self.room)
+        await interaction.response.send_message(
+            f"🥢 Bạn chọn **{num_red} đỏ - {num_white} trắng**", ephemeral=True
+        )
+        self.stop()
 
 
 class XocDia(commands.Cog):
@@ -67,98 +77,120 @@ class XocDia(commands.Cog):
     @app_commands.command(name="xocdia", description="🎲 Tạo phòng xóc đĩa")
     async def xocdia(self, interaction: discord.Interaction, so_nguoi: int, tien_cuoc: int):
         if so_nguoi < 2 or so_nguoi > 4:
-            return await interaction.response.send_message("❌ Chỉ được tạo phòng từ 2–4 người!", ephemeral=True)
+            return await interaction.response.send_message("❌ Số người chơi phải từ 2-4.", ephemeral=True)
 
-        if tien_cuoc <= 0:
-            return await interaction.response.send_message("❌ Tiền cược phải lớn hơn 0!", ephemeral=True)
+        user_id = interaction.user.id
+        user_data = get_user(DATA, user_id)
+        if user_data["money"] < tien_cuoc:
+            return await interaction.response.send_message("❌ Bạn không đủ tiền để tạo phòng.", ephemeral=True)
 
-        room_id = interaction.id
-        embed = discord.Embed(
-            title="🥢🎲 Phòng Xóc Đĩa",
-            description=f"**Người tạo:** {interaction.user.mention}\n💰 Tiền cược: **{tien_cuoc} Xu**\n👥 Số người: **{so_nguoi}**",
-            color=discord.Color.gold()
-        )
-        embed.add_field(name="📜 Trạng thái", value="Đang chờ người chơi tham gia...", inline=False)
-        embed.add_field(name="👥 Người chơi", value=f"{interaction.user.mention}", inline=False)
-
-        msg = await interaction.response.send_message(embed=embed, view=JoinView(self, room_id))
-        msg = await interaction.original_response()
-
+        room_id = f"room_{interaction.id}"
         self.rooms[room_id] = {
-            "host": interaction.user.id,
+            "host": user_id,
             "max_players": so_nguoi,
             "bet": tien_cuoc,
-            "players": {interaction.user.id: None},
-            "message": msg,
-            "result": None
+            "players": {user_id: {"choice": None}},
+            "message": None
         }
 
-    async def start_game(self, room):
-        # random kết quả
-        result = [random.choice(["Đỏ", "Trắng"]) for _ in range(4)]
-        room["result"] = result
-
         embed = discord.Embed(
-            title="🥢🎲 Xóc Đĩa Bắt Đầu",
-            description="Nhà cái đã xóc đĩa, hãy chọn dự đoán của bạn!",
-            color=discord.Color.red()
+            title="🎲 Xóc Đĩa Mini Game",
+            description=f"🥢 Người tạo: <@{user_id}>\n💰 Cược: **{tien_cuoc} xu**\n👥 Số người: **{so_nguoi}**",
+            color=discord.Color.gold()
         )
-        embed.add_field(name="👥 Người chơi", value="\n".join(f"<@{uid}>" for uid in room["players"].keys()), inline=False)
-        await room["message"].edit(embed=embed, view=None)
+        embed.add_field(name="👥 Người chơi", value=f"<@{user_id}>", inline=False)
 
-        # gửi lựa chọn riêng cho từng người
-        for uid in room["players"]:
-            user = self.bot.get_user(uid)
-            if user:
-                try:
-                    await user.send(embed=discord.Embed(
-                        title="🎲 Chọn số mặt đỏ",
-                        description="Chọn số mặt **Đỏ (0–4)**, số còn lại sẽ là **Trắng**.",
-                        color=discord.Color.blurple()
-                    ), view=ChoiceView(self, room, uid))
-                except:
-                    pass  # nếu user tắt DM thì thôi
+        view = JoinView(self, room_id)
+        msg = await interaction.response.send_message(embed=embed, view=view)
+        self.rooms[room_id]["message"] = await interaction.original_response()
 
-    async def reveal_result(self, room):
-        # đếm ngược mở bát
-        for i in range(5, 0, -1):
-            await room["message"].edit(embed=discord.Embed(
-                title="🥢🎲 Sắp mở bát!",
-                description=f"Kết quả sẽ mở trong **{i}** giây...",
-                color=discord.Color.orange()
-            ))
-            await asyncio.sleep(1)
+    async def start_game(self, room_id):
+        room = self.rooms.get(room_id)
+        if not room:
+            return
 
-        reds = room["result"].count("Đỏ")
-        whites = 4 - reds
+        msg = room["message"]
+
+        # Nhà cái xóc đĩa (ẩn kết quả)
+        coins = [random.choice(["🔴", "⚪"]) for _ in range(4)]
+        room["result"] = coins
+
         embed = discord.Embed(
-            title="🥢🎲 Kết Quả Xóc Đĩa",
-            description=f"Kết quả: **{reds} Đỏ – {whites} Trắng**",
+            title="🥢 Xóc Đĩa Bắt Đầu!",
+            description="🎲 Nhà cái đã xóc xong 4 đồng xu!\nMời người chơi chọn.",
             color=discord.Color.green()
         )
 
-        bet = room["bet"]
+        await msg.edit(embed=embed, view=None)
+
+        # Cho từng người chơi chọn
+        for pid in room["players"].keys():
+            player = msg.guild.get_member(pid)
+            if player:
+                view = ChoiceView(self, room_id, pid)
+                await player.send("🎲 Chọn kết quả bạn dự đoán:", view=view)
+
+        # Chờ 15s cho mọi người chọn
+        await asyncio.sleep(15)
+
+        # Đếm ngược mở bát
+        for i in range(5, 0, -1):
+            embed.description = f"⏳ Nhà cái sẽ mở bát sau **{i}** giây..."
+            await msg.edit(embed=embed)
+            await asyncio.sleep(1)
+
+        # Mở bát
+        reds = room["result"].count("🔴")
+        whites = 4 - reds
+        result_text = f"Kết quả: {' '.join(room['result'])} → **{reds} đỏ - {whites} trắng**"
+
         winners = []
-        for uid, choice in room["players"].items():
-            if choice == reds:
-                # số trúng = số đỏ đúng
-                reward = bet * (2 ** choice)  # x2, x4, x8, x16
-                user_data = get_user(DATA, uid)
-                user_data["money"] = user_data.get("money", 0) + reward
-                winners.append(f"<@{uid}> 🎉 +{reward} Xu")
+        bet = room["bet"]
+
+        for pid, data in room["players"].items():
+            choice = data["choice"]
+            if not choice:
+                continue
+
+            num_red, num_white = choice
+            correct = 0
+            if num_red <= reds:
+                correct += num_red
+            if num_white <= whites:
+                correct += num_white
+
+            if correct > 0:
+                multiplier = {1: 2, 2: 4, 3: 8, 4: 16}.get(correct, 0)
+                reward = bet * multiplier
+                user_data = get_user(DATA, pid)
+                user_data["money"] += reward
+                winners.append((pid, reward))
+
             else:
-                user_data = get_user(DATA, uid)
-                user_data["money"] = user_data.get("money", 0) - bet
+                user_data = get_user(DATA, pid)
+                user_data["money"] -= bet
 
         save_data()
+
+        result_embed = discord.Embed(
+            title="🥢 Kết Quả Xóc Đĩa",
+            description=f"{result_text}",
+            color=discord.Color.red()
+        )
         if winners:
-            embed.add_field(name="🏆 Người Thắng", value="\n".join(winners), inline=False)
+            result_embed.add_field(
+                name="🎉 Người thắng",
+                value="\n".join([f"<@{pid}> +{reward} xu" for pid, reward in winners]),
+                inline=False
+            )
         else:
-            embed.add_field(name="💸 Kết quả", value="Không ai đoán đúng!", inline=False)
+            result_embed.add_field(name="💀 Không ai thắng!", value="😭 Toang hết!", inline=False)
 
-        await room["message"].edit(embed=embed, view=None, delete_after=30)
-        del self.rooms[room["message"].id]
+        await msg.edit(embed=result_embed, view=None, delete_after=30)
+
+        # Xoá room
+        del self.rooms[room_id]
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot):
     await bot.add_cog(XocDia(bot))
