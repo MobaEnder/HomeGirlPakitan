@@ -1,20 +1,26 @@
 import json
 import os
 
-DATAUSER_FILE = "data/datauser.json"
-USERS_FILE = "data/users.json"
-
+# ==== ĐƯỜNG DẪN LƯU DỮ LIỆU TRONG VOLUME ====
+VOLUME_PATH = "/data"   # Railway sẽ mount Volume vào /data
+DATAUSER_FILE = os.path.join(VOLUME_PATH, "datauser.json")
+USERS_FILE = os.path.join(VOLUME_PATH, "users.json")
 
 # ===== HÀM ĐỌC / GHI JSON =====
 def read_json(file_path):
+    # Tạo thư mục nếu chưa tồn tại
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
     if not os.path.exists(file_path):
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump({}, f, ensure_ascii=False, indent=4)
+
     with open(file_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
 def write_json(file_path, data):
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
