@@ -1,9 +1,14 @@
 import json
 import os
 import asyncio
-import time
 
-DATA_FILE = "data/datauser.json"
+# ==== ĐƯỜNG DẪN DATA ====
+# Nếu Railway có mount volume /data thì sẽ dùng /data/datauser.json
+# Nếu không thì fallback về ./data/datauser.json (local test)
+if os.path.exists("/data"):
+    DATA_FILE = "/data/datauser.json"
+else:
+    DATA_FILE = "data/datauser.json"
 
 # Biến global để lưu dữ liệu trong RAM
 DATA = {}
@@ -25,7 +30,7 @@ def load_data():
     if not os.path.exists(DATA_FILE):
         os.makedirs(os.path.dirname(DATA_FILE), exist_ok=True)
         with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump({}, f)
+            json.dump({}, f, ensure_ascii=False, indent=4)
 
     try:
         with open(DATA_FILE, "r", encoding="utf-8") as f:
