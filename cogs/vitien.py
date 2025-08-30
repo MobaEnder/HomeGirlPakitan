@@ -7,24 +7,28 @@ class ViTien(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="vitien", description="💰 Xem số dư của bạn")
-    async def vitien(self, interaction: discord.Interaction):
-        user_id = interaction.user.id
-        user_data = get_user(DATA, user_id)
+    @app_commands.command(name="vitien", description="💰 Xem số dư của bạn hoặc người khác")
+    @app_commands.describe(user="Người mà bạn muốn xem ví (tùy chọn)")
+    async def vitien(self, interaction: discord.Interaction, user: discord.User = None):
+        if user is None:
+            user = interaction.user
+
+        user_data = get_user(DATA, user.id)
 
         balance = user_data.get("money", 0)
         job = user_data.get("job", "Chưa có nghề")
 
         embed = discord.Embed(
-            title="💰 Ví Tiền Của Bạn",
-            color=discord.Color.blurple()
+            title="💰 Ví Tiền",
+            color=discord.Color.gold()
         )
-        embed.add_field(name="👤 Người Dùng", value=f"{interaction.user.mention}", inline=False)
+        embed.add_field(name="👤 Chủ Ví", value=f"{user.mention}", inline=False)
         embed.add_field(name="💼 Nghề Nghiệp", value=f"**{job}**", inline=True)
-        embed.add_field(name="💰 Số Dư Hiện Tại", value=f"**{balance} Xu**", inline=True)
+        embed.add_field(name="💰 Số Dư", value=f"**{balance} Xu**", inline=True)
+        embed.set_thumbnail(url=user.display_avatar.url)
         embed.set_footer(text="🪙 Theo dõi số dư của bạn mọi lúc!")
 
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
