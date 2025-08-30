@@ -1,215 +1,195 @@
 import discord
-from discord import app_commands
 from discord.ext import commands
+from discord import app_commands
 import random
 import asyncio
-import time
 
-from utils.data import get_user, DATA, save_data
-
-# Bộ bài
-SUITS = ["♠", "♥", "♦", "♣"]
-RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
-VALUES = {
-    "A": 11, "2": 2, "3": 3, "4": 4, "5": 5,
-    "6": 6, "7": 7, "8": 8, "9": 9, "10": 10,
-    "J": 10, "Q": 10, "K": 10
-}
-
-rooms = {}
-
-class Xijack(commands.Cog):
-    def __init__(self, bot: commands.Bot):
-        self.bot = bot
-
-    def calculate_score(self, hand):
-        score = sum(VALUES[card[:-1]] for card in hand)
-        aces = sum(1 for card in hand if card.startswith("A"))
-        while score > 21 and aces:
-            score -= 10
-            aces -= 1
-        return score
-
-    def draw_card(self, deck):
-        return deck.pop(random.randint(0, len(deck) - 1))
-
-    @app_commands.command(name="xijack", description="🃏 Mini game Xì Dách (Blackjack)")
-    async def xijack(self, interaction: discord.Interaction, players: int, bet: int):
-        if players < 2 or players > 5:
-            return await interaction.response.send_message("⚠️ Phòng phải từ **2–5 người**!", ephemeral=True)
-
-        user_id = interaction.user.id
-        user_data = get_user(DATA, user_id)
-        if bet <= 0 or user_data["money"] < bet:
-            return await interaction.response.send_message("💸 Bạn không đủ tiền để đặt cược!", ephemeral=True)
-
-        room_id = interaction.channel.id
-        if room_id in rooms:
-            return await interaction.response.send_message("❌ Phòng này đã có game Xì Dách đang diễn ra!", ephemeral=True)
-
-        # Tạo phòng
-        rooms[room_id] = {
-            "owner": user_id,
-            "bet": bet,
-            "max_players": players,
-            "players": {user_id: {"hand": [], "stand": False}},
-            "deck": [r + s for r in RANKS for s in SUITS],
-            "turn_order": [],
-            "current_turn": 0,
-            "pot": 0,
-            "message": None
-        }
-
-        embed = discord.Embed(
-            title="🎰 Xì Dách (Blackjack)",
-            description=f"💵 Tiền cược: **{bet} xu**\n👥 Người chơi: **{len(rooms[room_id]['players'])}/{players}**\n\n➡️ Nhấn **Tham gia** để vào phòng!",
-            color=discord.Color.gold()
-        )
-        view = JoinView(room_id, self)
-
-        msg = await interaction.response.send_message(embed=embed, view=view)
-        rooms[room_id]["message"] = await interaction.original_response()
-
+rooms = {}  # lưu trữ phòng {room_id: {...}}
 
 class JoinView(discord.ui.View):
-    def __init__(self, room_id, cog):
+    def __init__(self, room_id, bet):
         super().__init__(timeout=None)
         self.room_id = room_id
-        self.cog = cog
+        self.bet = bet
 
-    @discord.ui.button(label="🎮 Tham gia", style=discord.ButtonStyle.green)
+    @discord.ui.button(label="🎮 Tham gia", style=discord.ButtonStyle.success)
     async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
         room = rooms.get(self.room_id)
         if not room:
-            return await interaction.response.send_message("❌ Phòng đã đóng!", ephemeral=True)
+            return await interaction.response.send_message("⚠️ Phòng không tồn tại!", ephemeral=True)
 
-        user_id = interaction.user.id
-        if user_id in room["players"]:
-            return await interaction.response.send_message("⚠️ Bạn đã tham gia phòng rồi!", ephemeral=True)
+        if interaction.user.id in room["players"]:
+            return await interaction.response.send_message("❌ Bạn đã tham gia phòng này rồi!", ephemeral=True)
 
         if len(room["players"]) >= room["max_players"]:
-            return await interaction.response.send_message("⚠️ Phòng đã đủ người!", ephemeral=True)
+            return await interaction.response.send_message("⚠️ Phòng đã đầy!", ephemeral=True)
 
-        user_data = get_user(DATA, user_id)
-        if user_data["money"] < room["bet"]:
-            return await interaction.response.send_message("💸 Bạn không đủ tiền để tham gia!", ephemeral=True)
+        room["players"][interaction.user.id] = {
+            "user": interaction.user,
+            "hand": [],
+            "stand": False
+        }
 
-        room["players"][user_id] = {"hand": [], "stand": False}
-        room["pot"] += room["bet"]
-        user_data["money"] -= room["bet"]
-        save_data()
-
-        # Update embed
+        # Cập nhật danh sách người chơi
+        players_text = "\n".join([p["user"].mention for p in room["players"].values()])
         embed = discord.Embed(
-            title="🎰 Xì Dách (Blackjack)",
-            description=f"💵 Tiền cược: **{room['bet']} xu**\n👥 Người chơi: **{len(room['players'])}/{room['max_players']}**\n\n➡️ Nhấn **Tham gia** để vào phòng!",
-            color=discord.Color.gold()
-        )
-        await room["message"].edit(embed=embed, view=self)
-
-        # Nếu đủ người → bắt đầu
-        if len(room["players"]) == room["max_players"]:
-            await self.start_game(room, interaction)
-
-    async def start_game(self, room, interaction):
-        await room["message"].edit(content="⏳ Game bắt đầu sau **5s**...", view=None)
-        await asyncio.sleep(5)
-
-        # Chia bài
-        for _ in range(2):
-            for uid in room["players"]:
-                card = self.cog.draw_card(room["deck"])
-                room["players"][uid]["hand"].append(card)
-
-        room["turn_order"] = list(room["players"].keys())
-        room["current_turn"] = 0
-
-        await self.next_turn(room, interaction)
-
-    async def next_turn(self, room, interaction):
-        if room["current_turn"] >= len(room["turn_order"]):
-            return await self.end_game(room, interaction)
-
-        uid = room["turn_order"][room["current_turn"]]
-        player_hand = room["players"][uid]["hand"]
-        score = self.cog.calculate_score(player_hand)
-
-        if score > 21:  # cháy
-            room["players"][uid]["stand"] = True
-            room["current_turn"] += 1
-            return await self.next_turn(room, interaction)
-
-        embed = discord.Embed(
-            title="🎴 Lượt chơi",
-            description=f"👤 {interaction.guild.get_member(uid).mention}\nBài: {' '.join(player_hand)}\nĐiểm: **{score}**",
-            color=discord.Color.blue()
-        )
-        view = ActionView(room, self.cog, interaction)
-        await room["message"].edit(embed=embed, view=view)
-
-
-class ActionView(discord.ui.View):
-    def __init__(self, room, cog, interaction):
-        super().__init__(timeout=20)
-        self.room = room
-        self.cog = cog
-        self.interaction = interaction
-
-    @discord.ui.button(label="🎴 Bốc thêm", style=discord.ButtonStyle.primary)
-    async def hit(self, interaction: discord.Interaction, button: discord.ui.Button):
-        uid = self.room["turn_order"][self.room["current_turn"]]
-        if interaction.user.id != uid:
-            return await interaction.response.send_message("⛔ Không phải lượt của bạn!", ephemeral=True)
-
-        card = self.cog.draw_card(self.room["deck"])
-        self.room["players"][uid]["hand"].append(card)
-        await self.cog.bot.get_cog("Xijack").next_turn(self.room, self.interaction)
-
-    @discord.ui.button(label="✋ Dừng", style=discord.ButtonStyle.red)
-    async def stand(self, interaction: discord.Interaction, button: discord.ui.Button):
-        uid = self.room["turn_order"][self.room["current_turn"]]
-        if interaction.user.id != uid:
-            return await interaction.response.send_message("⛔ Không phải lượt của bạn!", ephemeral=True)
-
-        self.room["players"][uid]["stand"] = True
-        self.room["current_turn"] += 1
-        await self.cog.bot.get_cog("Xijack").next_turn(self.room, self.interaction)
-
-
-    async def end_game(self, room, interaction):
-        results = []
-        winner = None
-        best_score = 0
-
-        for uid, pdata in room["players"].items():
-            score = self.cog.calculate_score(pdata["hand"])
-            results.append(f"👤 {interaction.guild.get_member(uid).mention} → {' '.join(pdata['hand'])} ({score})")
-            if score <= 21 and score > best_score:
-                best_score = score
-                winner = uid
-
-        embed = discord.Embed(
-            title="🏆 Kết quả Xì Dách",
-            description="\n".join(results),
+            title=f"🃏 Phòng Xì Dách #{self.room_id}",
+            description=f"💵 Tiền cược: **{room['bet']} xu**\n"
+                        f"👥 Người chơi:\n{players_text}",
             color=discord.Color.green()
         )
 
-        if winner:
-            get_user(DATA, winner)["money"] += room["pot"]
-            save_data()
-            embed.add_field(name="🥇 Người thắng", value=interaction.guild.get_member(winner).mention, inline=False)
+        await room["message"].edit(embed=embed, view=self)
+
+        # Nếu đủ số người chơi → bắt đầu sau 5s
+        if len(room["players"]) == room["max_players"]:
+            await interaction.response.send_message("✅ Đã đủ người, game sẽ bắt đầu sau **5s**!", ephemeral=True)
+            await asyncio.sleep(5)
+            await start_game(room)
+
+async def start_game(room):
+    deck = [str(v) + s for v in range(2, 11) for s in ["♠", "♥", "♦", "♣"]]
+    deck += [v + s for v in ["J", "Q", "K", "A"] for s in ["♠", "♥", "♦", "♣"]]
+    random.shuffle(deck)
+    room["deck"] = deck
+
+    # Chia 2 lá cho mỗi người
+    for player in room["players"].values():
+        player["hand"] = [deck.pop(), deck.pop()]
+
+    await next_turn(room)
+
+def calculate_score(hand):
+    value = 0
+    aces = 0
+    for card in hand:
+        rank = card[:-1]
+        if rank in ["J", "Q", "K"]:
+            value += 10
+        elif rank == "A":
+            value += 11
+            aces += 1
         else:
-            embed.add_field(name="💥 Không ai thắng", value="Tất cả đều cháy!", inline=False)
+            value += int(rank)
+    while value > 21 and aces:
+        value -= 10
+        aces -= 1
+    return value
 
-        await room["message"].edit(embed=embed, view=None)
-        del rooms[interaction.channel.id]
+async def next_turn(room):
+    players = list(room["players"].values())
+    if room.get("turn", 0) >= len(players):
+        await end_game(room)
+        return
 
-        await asyncio.sleep(30)
-        try:
-            await room["message"].delete()
-        except:
-            pass
+    player = players[room["turn"]]
+    user = player["user"]
+    hand = player["hand"]
+    score = calculate_score(hand)
 
+    embed = discord.Embed(
+        title=f"🎴 Lượt của {user.display_name}",
+        description=f"🃏 Bài: {', '.join(hand)}\n"
+                    f"⭐ Điểm hiện tại: **{score}**",
+        color=discord.Color.blurple()
+    )
+
+    view = TurnView(room, user.id)
+    await room["message"].edit(embed=embed, view=view)
+
+class TurnView(discord.ui.View):
+    def __init__(self, room, user_id):
+        super().__init__(timeout=30)
+        self.room = room
+        self.user_id = user_id
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return interaction.user.id == self.user_id
+
+    @discord.ui.button(label="🎴 Bốc thêm", style=discord.ButtonStyle.primary)
+    async def hit(self, interaction: discord.Interaction, button: discord.ui.Button):
+        player = self.room["players"][self.user_id]
+        card = self.room["deck"].pop()
+        player["hand"].append(card)
+
+        score = calculate_score(player["hand"])
+        if score > 21:
+            player["stand"] = True
+            await interaction.response.send_message("💥 Bạn đã **quá 21 (Cháy)**!", ephemeral=True)
+            self.room["turn"] += 1
+            await next_turn(self.room)
+        else:
+            await interaction.response.send_message(f"🃏 Bạn rút được: **{card}** (Điểm: {score})", ephemeral=True)
+
+    @discord.ui.button(label="✋ Dừng", style=discord.ButtonStyle.danger)
+    async def stand(self, interaction: discord.Interaction, button: discord.ui.Button):
+        player = self.room["players"][self.user_id]
+        player["stand"] = True
+        await interaction.response.send_message("✅ Bạn đã chọn **Dừng**.", ephemeral=True)
+        self.room["turn"] += 1
+        await next_turn(self.room)
+
+async def end_game(room):
+    results = []
+    for player in room["players"].values():
+        score = calculate_score(player["hand"])
+        results.append((player["user"], score, player["hand"]))
+
+    # Tìm người thắng
+    valid = [(u, s, h) for (u, s, h) in results if s <= 21]
+    if not valid:
+        winner_text = "❌ Không ai thắng, tất cả đều cháy!"
+    else:
+        winner = max(valid, key=lambda x: x[1])
+        winner_text = f"🏆 Người thắng: {winner[0].mention} với **{winner[1]} điểm** ({', '.join(winner[2])})"
+
+    desc = "\n".join([f"{u.mention}: {s} điểm ({', '.join(h)})" for u, s, h in results])
+
+    embed = discord.Embed(
+        title="🎉 Kết quả Xì Dách",
+        description=f"{desc}\n\n{winner_text}",
+        color=discord.Color.gold()
+    )
+    await room["message"].edit(embed=embed, view=None)
+    await asyncio.sleep(30)
+    await room["message"].delete()
+    del rooms[room["id"]]
+
+class XiJack(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+
+    @app_commands.command(name="xijack", description="🎲 Chơi Xì Dách (Blackjack)")
+    @app_commands.describe(
+        players="Số người chơi (2-5)",
+        bet="Số tiền cược"
+    )
+    async def xijack(self, interaction: discord.Interaction, players: int, bet: int):
+        if players < 2 or players > 5:
+            return await interaction.response.send_message("⚠️ Chỉ được chơi từ 2 đến 5 người!", ephemeral=True)
+
+        room_id = len(rooms) + 1
+        rooms[room_id] = {
+            "id": room_id,
+            "bet": bet,
+            "max_players": players,
+            "players": {interaction.user.id: {"user": interaction.user, "hand": [], "stand": False}},
+            "turn": 0
+        }
+
+        embed = discord.Embed(
+            title=f"🃏 Phòng Xì Dách #{room_id}",
+            description=f"💵 Tiền cược: **{bet} xu**\n"
+                        f"👥 Người chơi:\n{interaction.user.mention}\n\n"
+                        f"👉 Bấm nút để tham gia!",
+            color=discord.Color.green()
+        )
+
+        view = JoinView(room_id, bet)
+        msg = await interaction.channel.send(embed=embed, view=view)  # ✅ dùng channel.send thay vì response
+        rooms[room_id]["message"] = msg
+
+        await interaction.response.send_message(f"✅ Phòng #{room_id} đã được tạo!", ephemeral=True)
 
 async def setup(bot: commands.Bot):
-    await bot.add_cog(Xijack(bot))
+    await bot.add_cog(XiJack(bot))
