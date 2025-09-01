@@ -9,21 +9,21 @@ from utils.data import get_user, DATA, save_data
 
 # Tạo danh sách 15 quặng đá với giá trị ngẫu nhiên (theo chục và trăm, tổng ≤ 1000)
 QUANG_DA_LIST = [
-    {"name": "💎 Kim Cương", "value": random.randint(10, 900)},
-    {"name": "🔶 Thạch Anh Vàng", "value": random.randint(10, 900)},
-    {"name": "🔷 Saphia Xanh", "value": random.randint(10, 900)},
+    {"name": "💎 Kim Cương", "value": random.randint(10, 90)},
+    {"name": "🔶 Thạch Anh Vàng", "value": random.randint(10, 90)},
+    {"name": "🔷 Saphia Xanh", "value": random.randint(10, 90)},
     {"name": "🔹 Topaz", "value": random.randint(10, 900)},
-    {"name": "⚪ Ngọc Trắng", "value": random.randint(10, 900)},
-    {"name": "🟣 Amethyst", "value": random.randint(10, 900)},
-    {"name": "🟢 Emerald", "value": random.randint(10, 900)},
-    {"name": "🔴 Ruby", "value": random.randint(10, 900)},
-    {"name": "🟠 Citrine", "value": random.randint(10, 900)},
-    {"name": "🟡 Yellow Sapphire", "value": random.randint(10, 900)},
-    {"name": "🟤 Garnet", "value": random.randint(10, 900)},
-    {"name": "⚫ Obsidian", "value": random.randint(10, 900)},
-    {"name": "🔵 Aquamarine", "value": random.randint(10, 900)},
-    {"name": "🟣 Tanzanite", "value": random.randint(10, 900)},
-    {"name": "🟢 Peridot", "value": random.randint(10, 900)},
+    {"name": "⚪ Ngọc Trắng", "value": random.randint(10, 90)},
+    {"name": "🟣 Amethyst", "value": random.randint(10, 90)},
+    {"name": "🟢 Emerald", "value": random.randint(10, 90)},
+    {"name": "🔴 Ruby", "value": random.randint(10, 90)},
+    {"name": "🟠 Citrine", "value": random.randint(10, 90)},
+    {"name": "🟡 Yellow Sapphire", "value": random.randint(10, 90)},
+    {"name": "🟤 Garnet", "value": random.randint(10, 90)},
+    {"name": "⚫ Obsidian", "value": random.randint(10, 90)},
+    {"name": "🔵 Aquamarine", "value": random.randint(10, 90)},
+    {"name": "🟣 Tanzanite", "value": random.randint(10, 90)},
+    {"name": "🟢 Peridot", "value": random.randint(10, 90)},
 ]
 
 class WorkStore(commands.Cog):
