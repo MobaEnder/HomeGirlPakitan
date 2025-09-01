@@ -1,178 +1,163 @@
 import discord
 from discord.ext import commands
-from discord import app_commands
-import asyncio
 import random
-import json
-import os
+import asyncio
 
-DATA_FILE = "data.json"
-ROOMS = {}
+from data_manager import DATA, get_user, save_data
 
-def load_data():
-    if not os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump({}, f, ensure_ascii=False, indent=4)
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+class JoinView(discord.ui.View):
+    def __init__(self, cog, channel_id, timeout=30):
+        super().__init__(timeout=timeout)
+        self.cog = cog
+        self.channel_id = channel_id
 
-def save_data():
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(DATA, f, ensure_ascii=False, indent=4)
-
-def get_user(data, user_id):
-    if str(user_id) not in data:
-        data[str(user_id)] = {"money": 10000}
-    return data[str(user_id)]
-
-DATA = load_data()
-
-def tinh_diem(bai):
-    return sum(bai) % 10
-
-class JoinButton(discord.ui.View):
-    def __init__(self, room_id):
-        super().__init__(timeout=30)
-        self.room_id = room_id
-
-    @discord.ui.button(label="Tham gia phòng 🎮", style=discord.ButtonStyle.success)
-    async def join(self, interaction: discord.Interaction, button: discord.ui.Button):
-        room = ROOMS.get(self.room_id)
+    @discord.ui.button(label="🎮 Tham gia", style=discord.ButtonStyle.success)
+    async def join_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        room = self.cog.rooms.get(self.channel_id)
         if not room:
-            return await interaction.response.send_message("❌ Phòng không tồn tại!", ephemeral=True)
+            return await interaction.response.send_message("❌ Phòng đã đóng!", ephemeral=True)
 
-        if interaction.user.id in room["players"]:
-            return await interaction.response.send_message("❌ Bạn đã trong phòng!", ephemeral=True)
+        uid = interaction.user.id
+        if uid in room["players"]:
+            return await interaction.response.send_message("❌ Bạn đã tham gia rồi!", ephemeral=True)
 
-        if len(room["players"]) >= room["so_nguoi"]:
-            return await interaction.response.send_message("❌ Phòng đã đủ người!", ephemeral=True)
+        if len(room["players"]) >= 4:
+            return await interaction.response.send_message("❌ Phòng đã đủ 4 người!", ephemeral=True)
 
-        room["players"].append(interaction.user.id)
-        await interaction.response.send_message(f"✅ {interaction.user.mention} đã tham gia phòng!")
+        user = get_user(DATA, str(uid))
+        if user["money"] < room["bet"]:
+            return await interaction.response.send_message("❌ Bạn không đủ tiền để tham gia!", ephemeral=True)
 
-        if len(room["players"]) == room["so_nguoi"]:
-            await start_game(interaction, self.room_id)
+        room["players"].append(uid)
+        await interaction.response.send_message(f"✅ {interaction.user.mention} đã tham gia phòng!", ephemeral=False)
 
-async def start_game(interaction: discord.Interaction, room_id: int, bot_vs_dealer=False):
-    room = ROOMS[room_id]
-    players = room["players"]
-    cuoc = room["cuoc"]
 
-    # Trừ tiền cược
-    for uid in players:
-        get_user(DATA, uid)["money"] -= cuoc
-    save_data()
-
-    embed = discord.Embed(title="🎴 Ván Bài Cào sắp bắt đầu 🎴", color=discord.Color.gold())
-    msg = await interaction.followup.send(embed=embed, wait=True)
-
-    for i in range(5, 0, -1):
-        embed.description = f"⏳ Trò chơi bắt đầu sau **{i}** giây..."
-        await msg.edit(embed=embed)
-        await asyncio.sleep(1)
-
-    ket_qua = {}
-    for uid in players:
-        bai = [random.randint(1, 10) for _ in range(3)]
-        ket_qua[uid] = {"bai": bai, "diem": tinh_diem(bai)}
-
-    if bot_vs_dealer:
-        dealer_bai = [random.randint(1, 10) for _ in range(3)]
-        ket_qua["dealer"] = {"bai": dealer_bai, "diem": tinh_diem(dealer_bai)}
-
-    # Xác định người thắng
-    max_diem = max(info["diem"] for info in ket_qua.values())
-    winners = [uid for uid, info in ket_qua.items() if info["diem"] == max_diem]
-
-    tong_tien = cuoc * (2 if bot_vs_dealer else len(players))
-    tien_moi_nguoi = tong_tien // len(winners)
-
-    if bot_vs_dealer:
-        if "dealer" in winners:
-            # Nhà cái thắng
-            pass
-        else:
-            for uid in winners:
-                get_user(DATA, uid)["money"] += tong_tien
-        save_data()
-    else:
-        for uid in winners:
-            get_user(DATA, uid)["money"] += tien_moi_nguoi
-        save_data()
-
-    # Hiển thị kết quả
-    result_embed = discord.Embed(title="🏆 Kết quả Bài Cào 🏆", color=discord.Color.green())
-    for uid, info in ket_qua.items():
-        if uid == "dealer":
-            result_embed.add_field(
-                name="🤖 Nhà Cái",
-                value=f"🃏 {info['bai']} | ⭐ {info['diem']}",
-                inline=False
-            )
-        else:
-            member = await interaction.guild.fetch_member(uid)
-            money = get_user(DATA, uid)["money"]
-            result_embed.add_field(
-                name=member.display_name,
-                value=f"🃏 {info['bai']} | ⭐ {info['diem']}\n💰 {money} xu",
-                inline=False
-            )
-
-    await msg.edit(embed=result_embed)
-    await asyncio.sleep(30)
-    await msg.delete()
-    del ROOMS[room_id]
-
-class BaiCao(commands.Cog):
+class Baicao(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.rooms = {}  # {channel_id: {"bet": int, "players": [user_id]}}
 
-    group = app_commands.Group(name="baicao", description="🎴 Chơi bài cào")
+    @commands.hybrid_command(name="baicao", description="Chơi Bài Cào (1v1 Nhà Cái hoặc Tạo phòng 2-4 người)")
+    async def baicao(self, ctx, mode: str = None, bet: int = None):
+        if mode is None and bet is None:
+            return await ctx.reply("❌ Dùng `/baicao <số tiền>` để chơi với Nhà Cái\n❌ Hoặc `/baicao phong <số tiền>` để tạo phòng!", ephemeral=True)
 
-    @group.command(name="taophong", description="🎴 Tạo phòng bài cào")
-    @app_commands.describe(so_nguoi="Số người chơi (1-4, 1 = đấu nhà cái)", cuoc="Số tiền cược")
-    async def taophong(self, interaction: discord.Interaction, so_nguoi: int, cuoc: int):
-        user_id = interaction.user.id
-        user_data = get_user(DATA, user_id)
-
-        if user_data["money"] < cuoc:
-            return await interaction.response.send_message("❌ Bạn không đủ tiền để tạo phòng!", ephemeral=True)
-
-        if so_nguoi not in [1, 2, 3, 4]:
-            return await interaction.response.send_message("❌ Chỉ được tạo phòng từ 1-4 người!", ephemeral=True)
-
-        room_id = random.randint(0, 100)
-        while room_id in ROOMS:
-            room_id = random.randint(0, 100)
-
-        ROOMS[room_id] = {
-            "owner": user_id,
-            "so_nguoi": so_nguoi,
-            "cuoc": cuoc,
-            "players": [user_id],
-            "started": False
-        }
-
-        if so_nguoi == 1:
-            await interaction.response.send_message(f"🎴 Bạn đã tạo phòng đấu với **Nhà Cái** (cược {cuoc} xu)!")
-            await start_game(interaction, room_id, bot_vs_dealer=True)
+        # --- Chơi 1v1 với Nhà Cái ---
+        if mode is None and bet is not None:
+            await self.play_with_dealer(ctx, bet)
             return
 
-        view = JoinButton(room_id)
-        embed = discord.Embed(
-            title="🎴 Phòng Bài Cào 🎴",
-            description=f"👤 Chủ phòng: {interaction.user.mention}\n"
-                        f"👥 Số người: **{so_nguoi}**\n"
-                        f"💰 Tiền cược: **{cuoc} xu**\n\n"
-                        f"👉 Bấm nút bên dưới để tham gia!",
-            color=discord.Color.blurple()
-        )
-        msg = await interaction.response.send_message(embed=embed, view=view)
+        # --- Tạo phòng ---
+        if mode == "phong" and bet:
+            if ctx.channel.id in self.rooms:
+                return await ctx.reply("❌ Kênh này đã có phòng đang chờ!", ephemeral=True)
+
+            user = get_user(DATA, str(ctx.author.id))
+            if user["money"] < bet:
+                return await ctx.reply("❌ Bạn không đủ tiền để tạo phòng!", ephemeral=True)
+
+            self.rooms[ctx.channel.id] = {"bet": bet, "players": [ctx.author.id]}
+
+            embed = discord.Embed(
+                title="🎴 Phòng Bài Cào được tạo!",
+                description=f"💰 Tiền cược: **{bet:,} xu**\n👥 Người chơi: {ctx.author.mention}\n\n⏳ Nhấn nút bên dưới để tham gia (tối đa 4 người, tối thiểu 2).",
+                color=discord.Color.blurple()
+            )
+            view = JoinView(self, ctx.channel.id, timeout=30)
+            msg = await ctx.reply(embed=embed, view=view)
+
+            # Đợi 30s
+            await asyncio.sleep(30)
+
+            # Sau 30s kiểm tra phòng
+            room = self.rooms.get(ctx.channel.id)
+            if room and len(room["players"]) >= 2:
+                await self.start_room(ctx, room)
+            else:
+                await ctx.send("❌ Phòng không đủ người, bị hủy!")
+                if ctx.channel.id in self.rooms:
+                    del self.rooms[ctx.channel.id]
+            await msg.edit(view=None)  # tắt nút sau khi xong
+
+    # ====== Chơi với Nhà Cái ======
+    async def play_with_dealer(self, ctx, bet: int):
+        user = get_user(DATA, str(ctx.author.id))
+        if bet <= 0:
+            return await ctx.reply("❌ Số tiền cược phải lớn hơn 0!", ephemeral=True)
+        if user["money"] < bet:
+            return await ctx.reply("❌ Bạn không đủ tiền để cược!", ephemeral=True)
+
+        user["money"] -= bet
+        save_data()
+
+        def deal(): return [random.randint(1, 10) for _ in range(3)]
+        player_cards, dealer_cards = deal(), deal()
+        ps, ds = sum(player_cards) % 10, sum(dealer_cards) % 10
+
+        if ps > ds:
+            win_amount = bet * 2
+            user["money"] += win_amount
+            result_text = f"🎉 Bạn thắng! +{win_amount:,} xu"
+        elif ps < ds:
+            result_text = f"💀 Bạn thua! -{bet:,} xu"
+        else:
+            user["money"] += bet
+            result_text = "🤝 Hoà! Nhận lại tiền cược"
+
+        save_data()
+
+        embed = discord.Embed(title="🎴 Kết quả Bài Cào", color=discord.Color.gold())
+        embed.add_field(name=f"👤 {ctx.author.display_name}", value=f"{player_cards} → **{ps} điểm**", inline=True)
+        embed.add_field(name="🏦 Nhà Cái", value=f"{dealer_cards} → **{ds} điểm**", inline=True)
+        embed.add_field(name="📊 Kết quả", value=f"{result_text}\n💰 Số dư mới: **{user['money']:,} xu**", inline=False)
+        msg = await ctx.reply(embed=embed)
         await asyncio.sleep(30)
-        if room_id in ROOMS and not ROOMS[room_id]["started"]:
-            del ROOMS[room_id]
-            m = await interaction.original_response()
-            await m.delete()
+        try: await msg.delete()
+        except: pass
+
+    # ====== Bắt đầu phòng nhiều người ======
+    async def start_room(self, ctx, room):
+        bet = room["bet"]
+        dealer_cards = [random.randint(1, 10) for _ in range(3)]
+        dealer_score = sum(dealer_cards) % 10
+
+        result_embed = discord.Embed(title="🎴 Kết quả Phòng Bài Cào", color=discord.Color.green())
+        result_embed.add_field(name="🏦 Nhà Cái", value=f"{dealer_cards} → **{dealer_score} điểm**", inline=False)
+
+        for uid in room["players"]:
+            user = get_user(DATA, str(uid))
+            if user["money"] < bet:
+                result_embed.add_field(name=f"👤 <@{uid}>", value="❌ Không đủ tiền!", inline=False)
+                continue
+
+            user["money"] -= bet
+            cards = [random.randint(1, 10) for _ in range(3)]
+            score = sum(cards) % 10
+
+            if score > dealer_score:
+                win_amount = bet * 2
+                user["money"] += win_amount
+                outcome = f"🎉 Thắng! +{win_amount:,} xu"
+            elif score < dealer_score:
+                outcome = f"💀 Thua! -{bet:,} xu"
+            else:
+                user["money"] += bet
+                outcome = "🤝 Hoà! Nhận lại tiền"
+
+            result_embed.add_field(
+                name=f"👤 <@{uid}>",
+                value=f"{cards} → **{score} điểm**\n{outcome}\n💰 Số dư: {user['money']:,} xu",
+                inline=False
+            )
+
+        save_data()
+        del self.rooms[ctx.channel.id]
+
+        msg = await ctx.send(embed=result_embed)
+        await asyncio.sleep(60)
+        try: await msg.delete()
+        except: pass
+
 
 async def setup(bot):
-    await bot.add_cog(BaiCao(bot))
+    await bot.add_cog(Baicao(bot))
