@@ -9,21 +9,21 @@ from utils.data import get_user, DATA, save_data
 
 # 🎣 Danh sách cá + giá trị
 FISH_LIST = [
-    ("🐟 Cá Trắm", random.randint(10, 300)),
-    ("🐠 Cá Hề", random.randint(50, 500)),
-    ("🐡 Cá Nóc", random.randint(100, 600)),
-    ("🦈 Cá Mập Con", random.randint(200, 800)),
-    ("🐬 Cá Heo Nhỏ", random.randint(300, 900)),
-    ("🐳 Cá Voi Mini", random.randint(400, 1000)),
-    ("🦑 Mực", random.randint(50, 400)),
-    ("🦐 Tôm", random.randint(30, 350)),
-    ("🦞 Tôm Hùm", random.randint(200, 700)),
-    ("🦀 Cua", random.randint(50, 450)),
-    ("🐋 Cá Nhà Táng", random.randint(500, 1000)),
-    ("🐙 Bạch Tuộc", random.randint(150, 650)),
-    ("🐊 Cá Sấu Mini", random.randint(300, 900)),
-    ("🐌 Ốc Biển", random.randint(10, 200)),
-    ("🦦 Rái Cá", random.randint(100, 500)),
+    ("🐟 Cá Trắm", random.randint(10, 30)),
+    ("🐠 Cá Hề", random.randint(50, 100)),
+    ("🐡 Cá Nóc", random.randint(10, 60)),
+    ("🦈 Cá Mập Con", random.randint(20, 80)),
+    ("🐬 Cá Heo Nhỏ", random.randint(30, 90)),
+    ("🐳 Cá Voi Mini", random.randint(40, 100)),
+    ("🦑 Mực", random.randint(50, 10)),
+    ("🦐 Tôm", random.randint(30, 50)),
+    ("🦞 Tôm Hùm", random.randint(20, 70)),
+    ("🦀 Cua", random.randint(50, 80)),
+    ("🐋 Cá Nhà Táng", random.randint(50, 100)),
+    ("🐙 Bạch Tuộc", random.randint(10, 60)),
+    ("🐊 Cá Sấu Mini", random.randint(30, 90)),
+    ("🐌 Ốc Biển", random.randint(10, 20)),
+    ("🦦 Rái Cá", random.randint(10, 50)),
 ]
 
 class WorkFish(commands.Cog):
