@@ -37,8 +37,8 @@ class CuaBom(commands.Cog):
                 f"Cưa bom để nhân tiền, hoặc dừng lại.\n\n"
                 f"🔹 Lần 1: 100% thắng (x2)\n"
                 f"🔹 Lần 2: 70% thắng (x3)\n"
-                f"🔹 Lần 3: 50% thắng (x4)\n"
-                f"🔹 Lần 4+: 40% thắng (x5, x6 ...)\n\n"
+                f"🔹 Lần 3: 40% thắng (hiển thị giả: 50%) (x4)\n"
+                f"🔹 Lần 4+: giảm 10% mỗi lần (x5, x6 ...)\n\n"
                 f"⚠️ Chỉ từ lần 4 trở đi mới được dừng lại!"
             ),
             color=discord.Color.orange()
@@ -47,7 +47,7 @@ class CuaBom(commands.Cog):
         class CuaBomView(discord.ui.View):
             def __init__(self):
                 super().__init__()
-                self.current_bet = bet
+                self.current_money = bet   # số tiền đang giữ (ban đầu = tiền cược)
                 self.round = 1
                 self.stopped = False
 
@@ -60,12 +60,8 @@ class CuaBom(commands.Cog):
                 except:
                     pass
 
-            def get_multiplier(self):
-                """Tính hệ số nhân theo vòng"""
-                return self.round + 1  # Lần 1 = x2, Lần 2 = x3...
-
             def get_win_chance(self):
-                """Tỉ lệ thắng gốc"""
+                """Tỉ lệ thắng gốc theo vòng"""
                 if self.round == 1:
                     return 1.0
                 elif self.round == 2:
@@ -77,8 +73,8 @@ class CuaBom(commands.Cog):
                     return max(0, chance)
 
             def apply_flag_penalty(self, chance):
-                """Giảm 5% nếu user bị cờ đỏ"""
-                if user_id in DATA["flags"]:
+                """Giảm 5% nếu user bị cờ đỏ, chỉ áp dụng từ round 4+"""
+                if self.round >= 4 and user_id in DATA["flags"]:
                     return max(0, chance - 0.05)
                 return chance
 
@@ -93,24 +89,23 @@ class CuaBom(commands.Cog):
                 win = random.random() < win_chance
 
                 if win:
-                    # Thắng → nhân tiền
-                    self.current_bet = bet * self.get_multiplier()
+                    # Thắng → nhân tiền lên (x2, x3, x4...)
                     self.round += 1
+                    self.current_money *= self.round + 1  # Lần 1 x2, lần 2 x3, lần 3 x4...
 
-                    # Cập nhật cờ đỏ 🚩
-                    if user_id in DATA["flags"]:
-                        # Nếu đang bị flag mà thắng → reset
-                        DATA["flags"].remove(user_id)
-                    else:
-                        # Nếu chưa bị flag → thêm vào
-                        DATA["flags"].append(user_id)
-                    save_data()
+                    # 🚩 Cập nhật cờ đỏ (chỉ từ lần 4 trở đi)
+                    if self.round >= 4:
+                        if user_id in DATA["flags"]:
+                            DATA["flags"].remove(user_id)  # thắng thì reset
+                        else:
+                            DATA["flags"].append(user_id)  # lần đầu vào flag
+                        save_data()
 
                     embed.title = "💣 Cưa Bom - Tiếp Tục!"
                     shown_chance = "50%" if self.round == 3 else f"{int(self.get_win_chance() * 100)}%"
                     embed.description = (
                         f"✅ Cưa thành công!\n"
-                        f"💰 Tiền hiện tại: **{self.current_bet:,} xu** (x{self.get_multiplier()})\n\n"
+                        f"💰 Tiền hiện tại: **{self.current_money:,} xu**\n\n"
                         f"🔹 Tỉ lệ thắng lần tới: **{shown_chance}**\n"
                         f"👉 Bạn muốn tiếp tục hay dừng lại?"
                     )
@@ -136,12 +131,12 @@ class CuaBom(commands.Cog):
                     )
 
                 # Cộng tiền vào user
-                user_data["money"] += self.current_bet
+                user_data["money"] += self.current_money
                 save_data()
 
                 embed.title = "🪙 Bạn Đã Dừng Lại!"
                 embed.description = (
-                    f"🎉 Nhận an toàn **{self.current_bet:,} xu**!\n\n"
+                    f"🎉 Nhận an toàn **{self.current_money:,} xu**!\n\n"
                     f"💼 Số dư mới: **{user_data['money']:,} xu**"
                 )
                 embed.color = discord.Color.blue()
