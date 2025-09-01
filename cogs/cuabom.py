@@ -6,10 +6,6 @@ import asyncio
 
 from utils.data import get_user, DATA, save_data
 
-# Khởi tạo key flags nếu chưa có
-if "flags" not in DATA:
-    DATA["flags"] = []
-
 
 class CuaBom(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -37,8 +33,9 @@ class CuaBom(commands.Cog):
                 f"Cưa bom để nhân tiền, hoặc dừng lại.\n\n"
                 f"🔹 Lần 1: 100% thắng (x2)\n"
                 f"🔹 Lần 2: 70% thắng (x3)\n"
-                f"🔹 Lần 3: 60% thắng (x4)\n"
-                f"🔹 Lần 4+: giảm 10% mỗi lần (x5, x6 ...)\n\n"
+                f"🔹 Lần 3: 50% thắng (x4)\n"
+                f"🔹 Lần 4: 45% thắng (x5)\n"
+                f"🔹 Lần 5+: giảm 5% mỗi lần (x6, x7 ...)\n\n"
                 f"⚠️ Chỉ từ lần 4 trở đi mới được dừng lại!"
             ),
             color=discord.Color.orange()
@@ -47,7 +44,7 @@ class CuaBom(commands.Cog):
         class CuaBomView(discord.ui.View):
             def __init__(self):
                 super().__init__()
-                self.current_money = bet   # số tiền đang giữ (ban đầu = tiền cược)
+                self.current_money = bet   # tiền hiện tại
                 self.round = 1
                 self.stopped = False
 
@@ -61,22 +58,18 @@ class CuaBom(commands.Cog):
                     pass
 
             def get_win_chance(self):
-                """Tỉ lệ thắng gốc theo vòng"""
+                """Tỉ lệ thắng theo vòng"""
                 if self.round == 1:
                     return 1.0
                 elif self.round == 2:
                     return 0.7
                 elif self.round == 3:
-                    return 0.4
+                    return 0.45
+                elif self.round == 4:
+                    return 0.40
                 else:
-                    chance = 0.5 - 0.1 * (self.round - 3)
+                    chance = 0.40 - 0.05 * (self.round - 4)
                     return max(0, chance)
-
-            def apply_flag_penalty(self, chance):
-                """Giảm 5% nếu user bị cờ đỏ, chỉ áp dụng từ round 4+"""
-                if self.round >= 4 and user_id in DATA["flags"]:
-                    return max(0, chance - 0.05)
-                return chance
 
             @discord.ui.button(label="Cưa Bom 🔪", style=discord.ButtonStyle.danger)
             async def cuabom_button(self, interaction_button: discord.Interaction, button: discord.ui.Button):
@@ -85,28 +78,17 @@ class CuaBom(commands.Cog):
 
                 # Tỉ lệ thắng
                 win_chance = self.get_win_chance()
-                win_chance = self.apply_flag_penalty(win_chance)
                 win = random.random() < win_chance
 
                 if win:
-                    # Thắng → nhân tiền lên (x2, x3, x4...)
+                    # Nhân tiền theo vòng (lần 1 x2, lần 2 x3, ...)
+                    self.current_money = bet * (self.round + 1)
                     self.round += 1
-                    self.current_money *= self.round + 1  # Lần 1 x2, lần 2 x3, lần 3 x4...
-
-                    # 🚩 Cập nhật cờ đỏ (chỉ từ lần 4 trở đi)
-                    if self.round >= 4:
-                        if user_id in DATA["flags"]:
-                            DATA["flags"].remove(user_id)  # thắng thì reset
-                        else:
-                            DATA["flags"].append(user_id)  # lần đầu vào flag
-                        save_data()
 
                     embed.title = "💣 Cưa Bom - Tiếp Tục!"
-                    shown_chance = "50%" if self.round == 3 else f"{int(self.get_win_chance() * 100)}%"
                     embed.description = (
                         f"✅ Cưa thành công!\n"
                         f"💰 Tiền hiện tại: **{self.current_money:,} xu**\n\n"
-                        f"🔹 Tỉ lệ thắng lần tới: **{shown_chance}**\n"
                         f"👉 Bạn muốn tiếp tục hay dừng lại?"
                     )
                     embed.color = discord.Color.green()
