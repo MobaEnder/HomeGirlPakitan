@@ -67,7 +67,7 @@ async def start_race(interaction: discord.Interaction, room_id: str):
         await asyncio.sleep(1)
 
     # danh sách 7 ngựa
-    horse_icons = ["🏇", "🐎"]
+    horse_icons = ["🏇"]
     track_length = 20
     positions = [0] * 7
 
