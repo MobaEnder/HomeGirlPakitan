@@ -37,8 +37,8 @@ class CuaBom(commands.Cog):
                 f"Cưa bom để nhân tiền, hoặc dừng lại.\n\n"
                 f"🔹 Lần 1: 100% thắng (x2)\n"
                 f"🔹 Lần 2: 70% thắng (x3)\n"
-                f"🔹 Lần 3: 40% thắng (hiển thị giả: 50%) (x4)\n"
-                f"🔹 Lần 4+: giảm 10% mỗi lần (x5, x6 ...)\n\n"
+                f"🔹 Lần 3: 50% thắng (x4)\n"
+                f"🔹 Lần 4+: 40% thắng (x5, x6 ...)\n\n"
                 f"⚠️ Chỉ từ lần 4 trở đi mới được dừng lại!"
             ),
             color=discord.Color.orange()
