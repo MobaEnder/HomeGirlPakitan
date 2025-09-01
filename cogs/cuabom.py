@@ -27,7 +27,13 @@ class CuaBom(commands.Cog):
 
         embed = discord.Embed(
             title="💣 Cưa Bom - Bắt Đầu!",
-            description=f"💼 Bạn cược **{bet:,} xu**\n\nCưa bom để nhân đôi, hoặc dừng lại.\n\n🔹 Lần 1: 100% thắng\n🔹 Lần 2: 70% thắng\n🔹 Lần 3+: 50% thắng",
+            description=(
+                f"💼 Bạn cược **{bet:,} xu**\n\n"
+                f"Cưa bom để nhân đôi, hoặc dừng lại.\n\n"
+                f"🔹 Lần 1: 100% thắng\n"
+                f"🔹 Lần 2: 70% thắng\n"
+                f"🔹 Lần 3+: 50% thắng"
+            ),
             color=discord.Color.orange()
         )
 
@@ -47,24 +53,36 @@ class CuaBom(commands.Cog):
                 except:
                     pass
 
+            def get_win_chance(self):
+                """Ẩn công thức tỉ lệ thắng sau lần 3"""
+                if self.round == 1:
+                    return 1.0
+                elif self.round == 2:
+                    return 0.7
+                elif self.round == 3:
+                    return 0.5
+                else:
+                    # từ lần 4 trở đi giảm 10% mỗi lần
+                    chance = 0.5 - 0.1 * (self.round - 3)
+                    return max(0, chance)
+
             @discord.ui.button(label="Cưa Bom 🔪", style=discord.ButtonStyle.danger)
             async def cuabom_button(self, interaction_button: discord.Interaction, button: discord.ui.Button):
                 if self.stopped:
                     return await interaction_button.response.send_message("⚠️ Trò chơi đã kết thúc!", ephemeral=True)
 
                 # Xác suất thắng
-                if self.round == 1:
-                    win = True
-                elif self.round == 2:
-                    win = random.random() < 0.7
-                else:
-                    win = random.random() < 0.5
+                win_chance = self.get_win_chance()
+                win = random.random() < win_chance
 
                 if win:
                     self.current_bet *= 2
                     self.round += 1
                     embed.title = "💣 Cưa Bom - Tiếp Tục!"
-                    embed.description = f"✅ Cưa thành công! Số tiền hiện tại: **{self.current_bet:,} xu**\n\nCưa tiếp hoặc nhấn 'Dừng lại' (nếu đủ vòng) để nhận tiền."
+                    embed.description = (
+                        f"✅ Cưa thành công! Số tiền hiện tại: **{self.current_bet:,} xu**\n\n"
+                        f"Cưa tiếp hoặc nhấn 'Dừng lại' (nếu đủ vòng) để nhận tiền."
+                    )
                     embed.color = discord.Color.green()
                     await interaction_button.response.edit_message(embed=embed, view=self)
                 else:
