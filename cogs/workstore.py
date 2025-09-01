@@ -12,7 +12,7 @@ QUANG_DA_LIST = [
     {"name": "💎 Kim Cương", "value": random.randint(10, 90)},
     {"name": "🔶 Thạch Anh Vàng", "value": random.randint(10, 90)},
     {"name": "🔷 Saphia Xanh", "value": random.randint(10, 90)},
-    {"name": "🔹 Topaz", "value": random.randint(10, 900)},
+    {"name": "🔹 Topaz", "value": random.randint(10, 90)},
     {"name": "⚪ Ngọc Trắng", "value": random.randint(10, 90)},
     {"name": "🟣 Amethyst", "value": random.randint(10, 90)},
     {"name": "🟢 Emerald", "value": random.randint(10, 90)},
