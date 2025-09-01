@@ -21,7 +21,7 @@ class CuaBom(commands.Cog):
         if user_data["money"] < bet:
             return await interaction.response.send_message("💸 Bạn không đủ tiền để cược!", ephemeral=True)
 
-        # Trừ tiền cược
+        # Trừ tiền cược ban đầu
         user_data["money"] -= bet
         save_data()
 
@@ -29,10 +29,11 @@ class CuaBom(commands.Cog):
             title="💣 Cưa Bom - Bắt Đầu!",
             description=(
                 f"💼 Bạn cược **{bet:,} xu**\n\n"
-                f"Cưa bom để nhân đôi, hoặc dừng lại.\n\n"
-                f"🔹 Lần 1: 100% thắng\n"
-                f"🔹 Lần 2: 70% thắng\n"
-                f"🔹 Lần 3+: 50% thắng"
+                f"Cưa bom để nhân số tiền theo từng vòng, hoặc dừng lại.\n\n"
+                f"🔹 Lần 1: 100% thắng (x1.25)\n"
+                f"🔹 Lần 2: 70% thắng (x1.5)\n"
+                f"🔹 Lần 3: 50% thắng (x1.75)\n"
+                f"🔹 Lần 4+: giảm dần tỉ lệ, nhân thêm x0.25 mỗi lần"
             ),
             color=discord.Color.orange()
         )
@@ -40,7 +41,8 @@ class CuaBom(commands.Cog):
         class CuaBomView(discord.ui.View):
             def __init__(self):
                 super().__init__()
-                self.current_bet = bet
+                self.base_bet = bet
+                self.current_reward = bet  # số tiền hiện tại có thể nhận
                 self.round = 1
                 self.stopped = False
 
@@ -53,41 +55,53 @@ class CuaBom(commands.Cog):
                 except:
                     pass
 
-            def get_win_chance(self):
-                """Ẩn công thức tỉ lệ thắng sau lần 3"""
+            def get_real_chance(self):
+                """Tỉ lệ thắng thật sự"""
                 if self.round == 1:
                     return 1.0
                 elif self.round == 2:
                     return 0.7
                 elif self.round == 3:
-                    return 0.5
+                    return 0.4   # thật sự 40%
                 else:
-                    # từ lần 4 trở đi giảm 10% mỗi lần
-                    chance = 0.5 - 0.1 * (self.round - 3)
-                    return max(0, chance)
+                    # từ lần 4 trở đi: 0.4 - 0.1*(round-3)
+                    return max(0, 0.4 - 0.1 * (self.round - 3))
+
+            def get_display_chance(self):
+                """Tỉ lệ hiển thị cho người chơi (đánh lừa)"""
+                if self.round == 3:
+                    return 0.5  # hiển thị 50% dù thật là 40%
+                return self.get_real_chance()
+
+            def calc_multiplier(self):
+                """Hệ số nhân theo vòng"""
+                return 1.0 + 0.25 * self.round
 
             @discord.ui.button(label="Cưa Bom 🔪", style=discord.ButtonStyle.danger)
             async def cuabom_button(self, interaction_button: discord.Interaction, button: discord.ui.Button):
                 if self.stopped:
                     return await interaction_button.response.send_message("⚠️ Trò chơi đã kết thúc!", ephemeral=True)
 
-                # Xác suất thắng
-                win_chance = self.get_win_chance()
+                win_chance = self.get_real_chance()
                 win = random.random() < win_chance
 
                 if win:
-                    self.current_bet *= 2
+                    self.current_reward = int(self.base_bet * self.calc_multiplier())
                     self.round += 1
+
+                    next_display = int(self.base_bet * self.calc_multiplier())
                     embed.title = "💣 Cưa Bom - Tiếp Tục!"
                     embed.description = (
-                        f"✅ Cưa thành công! Số tiền hiện tại: **{self.current_bet:,} xu**\n\n"
-                        f"Cưa tiếp hoặc nhấn 'Dừng lại' (nếu đủ vòng) để nhận tiền."
+                        f"✅ Cưa thành công!\n"
+                        f"💰 Tiền hiện tại: **{self.current_reward:,} xu**\n\n"
+                        f"➡️ Lần {self.round}: {int(self.get_display_chance()*100)}% thắng "
+                        f"(x{1 + 0.25*self.round:.2f})"
                     )
                     embed.color = discord.Color.green()
                     await interaction_button.response.edit_message(embed=embed, view=self)
                 else:
                     embed.title = "💥 BÙM! Bom Nổ!"
-                    embed.description = f"💀 Bạn mất **{self.current_bet:,} xu**"
+                    embed.description = f"💀 Bạn mất hết số tiền cược (**{self.base_bet:,} xu**)"
                     embed.color = discord.Color.red()
                     self.stopped = True
                     await self.end_game(message)
@@ -97,28 +111,11 @@ class CuaBom(commands.Cog):
                 if self.stopped:
                     return await interaction_button.response.send_message("⚠️ Trò chơi đã kết thúc!", ephemeral=True)
 
-                # Lần 1 → nhận lại tiền cược ban đầu
-                if self.round == 1:
-                    user_data["money"] += bet
-                    save_data()
-                    embed.title = "🪙 Bạn Đã Dừng Lại Lần 1"
-                    embed.description = f"🎉 Nhận lại **{bet:,} xu** (chưa nhân đôi)."
-                    embed.color = discord.Color.blue()
-                    self.stopped = True
-                    await self.end_game(message)
-                    return
-
-                # Lần 2 & 3 → không thể dừng
-                if self.round in [2, 3]:
-                    return await interaction_button.response.send_message(
-                        f"⛔ Bạn phải tiếp tục cưa! Không thể dừng lần {self.round}.", ephemeral=True
-                    )
-
-                # Lần 4 trở đi → được chọn dừng
-                user_data["money"] += self.current_bet
+                # Cho phép dừng ở mọi vòng > 1
+                user_data["money"] += self.current_reward
                 save_data()
                 embed.title = "🪙 Bạn Đã Dừng Lại!"
-                embed.description = f"🎉 Nhận **{self.current_bet:,} xu** an toàn."
+                embed.description = f"🎉 Nhận **{self.current_reward:,} xu** an toàn."
                 embed.color = discord.Color.blue()
                 self.stopped = True
                 await self.end_game(message)
