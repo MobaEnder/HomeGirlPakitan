@@ -15,7 +15,7 @@ FISH_LIST = [
     ("🦈 Cá Mập Con", random.randint(20, 80)),
     ("🐬 Cá Heo Nhỏ", random.randint(30, 90)),
     ("🐳 Cá Voi Mini", random.randint(40, 100)),
-    ("🦑 Mực", random.randint(50, 10)),
+    ("🦑 Mực", random.randint(10, 60)),
     ("🦐 Tôm", random.randint(30, 50)),
     ("🦞 Tôm Hùm", random.randint(20, 70)),
     ("🦀 Cua", random.randint(50, 80)),
