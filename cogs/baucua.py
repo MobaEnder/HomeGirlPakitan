@@ -20,7 +20,7 @@ class BauCua(commands.Cog):
         "tom": "🦐 Tôm",
     }
 
-    @app_commands.command(name="baucua", description="Chơi Mini Game Bầu Cua 🦀🐟🐓")
+    @app_commands.command(name="baucua", description="🎲 Chơi Mini Game Bầu Cua 🦀🐟🐓")
     @app_commands.describe(
         bet="Số tiền muốn cược",
         choice="Chọn con vật để cược"
@@ -42,15 +42,34 @@ class BauCua(commands.Cog):
         if now - user_data.get("last_baucua", 0) < 10:
             remaining = int(10 - (now - user_data["last_baucua"]))
             return await interaction.response.send_message(
-                f"⏳ Bạn phải đợi **{remaining}s** mới có thể chơi lại Bầu Cua!",
+                embed=discord.Embed(
+                    title="⏳ Chậm thôi!",
+                    description=f"Bạn phải đợi **{remaining}s** mới có thể chơi lại!",
+                    color=discord.Color.orange()
+                ),
                 ephemeral=True
             )
 
         # Kiểm tra số dư
         if bet <= 0:
-            return await interaction.response.send_message("❌ Số tiền cược phải lớn hơn 0!", ephemeral=True)
+            return await interaction.response.send_message(
+                embed=discord.Embed(
+                    title="❌ Lỗi",
+                    description="Số tiền cược phải lớn hơn **0 Xu**!",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+
         if user_data["money"] < bet:
-            return await interaction.response.send_message("💸 Bạn không đủ tiền để cược!", ephemeral=True)
+            return await interaction.response.send_message(
+                embed=discord.Embed(
+                    title="💸 Không đủ tiền",
+                    description=f"Bạn chỉ có **{user_data['money']} Xu**, không đủ để cược!",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
 
         # Trừ tiền cược
         user_data["money"] -= bet
@@ -60,9 +79,10 @@ class BauCua(commands.Cog):
         # Gửi embed chờ
         embed = discord.Embed(
             title="🎲 Bầu Cua Đang Lắc...",
-            description=f"💼 Bạn đã cược **{bet} Xu** vào **{self.animals[choice.value]}**",
+            description=f"💼 Bạn đã cược **{bet:,} Xu** vào **{self.animals[choice.value]}**",
             color=discord.Color.yellow()
         )
+        embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/3082/3082031.png")
         embed.set_footer(text="⏳ Vui lòng chờ 5s để xem kết quả!")
         await interaction.response.send_message(embed=embed)
         message = await interaction.original_response()
@@ -85,23 +105,29 @@ class BauCua(commands.Cog):
             total_reward = bet + reward
             user_data["money"] += total_reward
             save_data()
-            outcome = f"🎉 Bạn trúng **{win_count} lần**!\n💰 Nhận về **+{total_reward} Xu**"
+            outcome = (
+                f"🎉 Bạn trúng **{win_count} lần**!\n"
+                f"💰 Nhận về **+{total_reward:,} Xu**"
+            )
             color = discord.Color.green()
+            thumb = "https://cdn-icons-png.flaticon.com/512/4315/4315445.png"
         else:
-            outcome = f"💀 Bạn không trúng con nào!\n❌ Mất **{bet} Xu**"
+            outcome = f"💀 Bạn không trúng con nào!\n❌ Mất **{bet:,} Xu**"
             color = discord.Color.red()
+            thumb = "https://cdn-icons-png.flaticon.com/512/463/463612.png"
 
         # Embed kết quả
         result_embed = discord.Embed(
             title="🎲 Kết Quả Bầu Cua",
             description=(
-                f"**{result_icons}**\n\n"
+                f"**Kết quả:** {result_icons}\n\n"
                 f"💼 **Bạn Cược:** {self.animals[choice.value]}\n"
                 f"{outcome}\n\n"
-                f"💳 **Số Dư Hiện Tại:** {user_data['money']} Xu"
+                f"💳 **Số Dư Hiện Tại:** {user_data['money']:,} Xu"
             ),
             color=color
         )
+        result_embed.set_thumbnail(url=thumb)
         result_embed.set_footer(text="⏳ Tin nhắn sẽ tự xóa sau 30s.")
 
         await message.edit(embed=result_embed)
