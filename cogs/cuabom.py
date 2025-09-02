@@ -30,18 +30,19 @@ class CuaBom(commands.Cog):
             title="💣 Cưa Bom - Bắt Đầu!",
             description=(
                 f"💼 Bạn cược **{bet:,} xu**\n\n"
-                f"🔹 Lần 1: 100% thắng → x2\n"
-                f"🔹 Lần 2: 80% thắng → ×0.75 tiền trước đó\n"
-                f"🔹 Lần 3: 50% thắng → ×0.75 tiền trước đó\n"
-                f"🔹 Lần 4+: 40% thắng → ×0.75 tiền trước đó\n\n"
+                f"🔹 Lần 1: 100% thắng → ×2\n"
+                f"🔹 Lần 2: 80% thắng → ×2.75\n"
+                f"🔹 Lần 3: 50% thắng → ×2.75\n"
+                f"🔹 Lần 4+: 40% thắng → ×2.75\n\n"
                 f"⚠️ Chỉ được dừng ngay **lần đầu** (cảnh báo) hoặc từ **lần 4** trở đi!"
             ),
             color=discord.Color.orange()
         )
 
         class CuaBomView(discord.ui.View):
-            def __init__(self):
+            def __init__(self, owner_id: int):
                 super().__init__(timeout=120)
+                self.owner_id = owner_id
                 self.current_money = bet
                 self.round = 1
                 self.stopped = False
@@ -60,11 +61,11 @@ class CuaBom(commands.Cog):
             def next_reward(self):
                 """Tính tiền vòng tiếp theo"""
                 if self.round == 1:
-                    return self.current_money * 2  # lần 1 x2
+                    return self.current_money * 2
                 else:
-                    return int(self.current_money * 0.75)
+                    return int(self.current_money * 2.75)
 
-            async def end_game(self):
+            async def end_game(self, embed: discord.Embed):
                 embed.set_footer(text="⏳ Tin nhắn sẽ tự xóa sau 30 giây.")
                 await self.message.edit(embed=embed, view=None)
                 await asyncio.sleep(30)
@@ -75,6 +76,8 @@ class CuaBom(commands.Cog):
 
             @discord.ui.button(label="Cưa Bom 🔪", style=discord.ButtonStyle.danger)
             async def cuabom_button(self, interaction_button: discord.Interaction, button: discord.ui.Button):
+                if interaction_button.user.id != self.owner_id:
+                    return await interaction_button.response.send_message("⛔ Đây không phải trò chơi của bạn!", ephemeral=True)
                 if self.stopped:
                     return await interaction_button.response.send_message("⚠️ Trò chơi đã kết thúc!", ephemeral=True)
 
@@ -85,34 +88,38 @@ class CuaBom(commands.Cog):
                     self.current_money = self.next_reward()
                     self.round += 1
 
-                    embed.title = "💣 Cưa Bom - Tiếp Tục!"
-                    embed.description = (
-                        f"✅ Cưa thành công!\n"
-                        f"💰 Tiền hiện tại: **{self.current_money:,} xu**\n\n"
-                        f"👉 Bạn muốn tiếp tục hay dừng lại?"
+                    embed = discord.Embed(
+                        title="💣 Cưa Bom - Tiếp Tục!",
+                        description=(
+                            f"✅ Cưa thành công!\n"
+                            f"💰 Tiền hiện tại: **{self.current_money:,} xu**\n\n"
+                            f"👉 Bạn muốn tiếp tục hay dừng lại?"
+                        ),
+                        color=discord.Color.green()
                     )
-                    embed.color = discord.Color.green()
                     await interaction_button.response.edit_message(embed=embed, view=self)
                 else:
-                    embed.title = "💥 BÙM! Bom Nổ!"
-                    embed.description = f"💀 Bạn mất sạch số tiền cược (**{bet:,} xu**)."
-                    embed.color = discord.Color.red()
+                    embed = discord.Embed(
+                        title="💥 BÙM! Bom Nổ!",
+                        description=f"💀 Bạn mất sạch số tiền cược (**{bet:,} xu**).",
+                        color=discord.Color.red()
+                    )
                     self.stopped = True
-                    await self.end_game()
+                    await self.end_game(embed)
 
             @discord.ui.button(label="Dừng Lại ✋", style=discord.ButtonStyle.success)
             async def stop_button(self, interaction_button: discord.Interaction, button: discord.ui.Button):
+                if interaction_button.user.id != self.owner_id:
+                    return await interaction_button.response.send_message("⛔ Đây không phải trò chơi của bạn!", ephemeral=True)
                 if self.stopped:
                     return await interaction_button.response.send_message("⚠️ Trò chơi đã kết thúc!", ephemeral=True)
 
-                # chỉ cho phép dừng ở lần đầu (cảnh báo) hoặc từ lần 4 trở đi
                 if self.round == 1:
                     warning = (
                         "⚠️ Dừng ngay lần đầu đồng nghĩa với việc **chỉ nhận lại số tiền cược**, "
-                        "không có lợi nhuận!\nBạn có chắc muốn dừng?"
+                        "không có lợi nhuận!\nBạn đã được hoàn lại tiền."
                     )
                     await interaction_button.response.send_message(warning, ephemeral=True)
-                    # trả lại tiền cược
                     user_data["money"] += bet
                 elif self.round >= 4:
                     user_data["money"] += self.current_money
@@ -122,16 +129,18 @@ class CuaBom(commands.Cog):
                     )
 
                 save_data()
-                embed.title = "🪙 Bạn Đã Dừng Lại!"
-                embed.description = (
-                    f"🎉 Nhận an toàn **{self.current_money:,} xu**!\n\n"
-                    f"💼 Số dư mới: **{user_data['money']:,} xu**"
+                embed = discord.Embed(
+                    title="🪙 Bạn Đã Dừng Lại!",
+                    description=(
+                        f"🎉 Nhận an toàn **{self.current_money:,} xu**!\n\n"
+                        f"💼 Số dư mới: **{user_data['money']:,} xu**"
+                    ),
+                    color=discord.Color.blue()
                 )
-                embed.color = discord.Color.blue()
                 self.stopped = True
-                await self.end_game()
+                await self.end_game(embed)
 
-        view = CuaBomView()
+        view = CuaBomView(user_id)
         await interaction.response.send_message(embed=embed, view=view)
         view.message = await interaction.original_response()
 
