@@ -1,7 +1,9 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-import random, time
+import random
+import time
+
 from utils.data import get_user, save_data, DATA
 
 # cooldown dictionary (user_id : timestamp)
@@ -48,8 +50,12 @@ class CuopBoc(commands.Cog):
 
         # --- kiểm tra bảo vệ ---
         if target.get("baove", 0) > 0:
+            # giảm 1 lượt bảo vệ của target
             target["baove"] -= 1
             save_data()
+
+            # đặt cooldown 1 tiếng cho kẻ cướp ngay cả khi bị chặn
+            COOLDOWN_CUOPBOC[user_id] = now + 3600
 
             embed = discord.Embed(
                 title="🛡️ Cướp bị chặn!",
@@ -60,20 +66,23 @@ class CuopBoc(commands.Cog):
                 color=discord.Color.blue()
             )
             embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/3068/3068384.png")
-            embed.add_field(name="🛡️ Lượt bảo vệ còn lại của nạn nhân", value=f"**{target['baove']} lần**", inline=False)
+            embed.add_field(name="🛡️ Lượt bảo vệ còn lại của nạn nhân", value=f"**{target.get('baove',0)} lần**", inline=True)
+            embed.add_field(name="📥 Số dư của bạn", value=f"**{thief['money']:,} xu**", inline=True)
+            embed.add_field(name="📤 Số dư của mục tiêu", value=f"**{target['money']:,} xu**", inline=True)
             return await interaction.response.send_message(embed=embed)
 
-        # đặt cooldown 1 tiếng
-        COOLDOWN_CUOPBOC[user_id] = now + 3600  
+        # đặt cooldown 1 tiếng cho kẻ cướp (áp dụng cho mọi kết quả)
+        COOLDOWN_CUOPBOC[user_id] = now + 3600
 
-        # xác suất thành công 30%
-        success = random.random() < 0.3
+        # xác suất thành công 40% (theo yêu cầu)
+        success = random.random() < 0.4
 
         if success:
             # số tiền cướp được: 3% - 6% tiền của target
             percent = random.uniform(0.03, 0.06)
             stolen = int(target["money"] * percent)
-            stolen = max(100, min(stolen, target["money"]))  # ít nhất 100 xu
+            # đảm bảo ít nhất 100 xu và không vượt quá tiền target
+            stolen = max(100, min(stolen, target["money"]))
 
             target["money"] -= stolen
             thief["money"] += stolen
@@ -82,10 +91,8 @@ class CuopBoc(commands.Cog):
             embed = discord.Embed(
                 title="💼 Cướp thành công!",
                 description=(
-                    f"{interaction.user.mention} đã cướp từ {nguoi.mention}!\n\n"
-                    f"💰 Số tiền: **{stolen:,} xu**\n"
-                    f"📊 Tỉ lệ: **{percent*100:.2f}%** tài sản của {nguoi.mention}\n\n"
-                    f"🎉 Tiền đã được cộng vào ví của bạn!"
+                    f"{interaction.user.mention} đã **cướp thành công {stolen:,} xu** từ {nguoi.mention}!\n\n"
+                    f"📊 Tỉ lệ lấy: **{percent*100:.2f}%** tài sản của {nguoi.mention}"
                 ),
                 color=discord.Color.green()
             )
