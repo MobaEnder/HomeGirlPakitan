@@ -20,8 +20,6 @@ JOBS = [
     "Wibu 📚",
     "Eodibiti 🏳️‍🌈",
     "MoiDen 👦🏿",
-
-    # 🌟 Nghề mới thêm
     "Streamer 📺",
     "Nông Dân 👨‍🌾",
     "Bán Vé Số 🎫",
@@ -41,12 +39,17 @@ class SetJob(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
+    async def job_autocomplete(
+        self, interaction: discord.Interaction, current: str
+    ) -> list[app_commands.Choice[str]]:
+        # Lọc nghề theo chữ người dùng gõ
+        jobs = [job for job in JOBS if current.lower() in job.lower()]
+        return [app_commands.Choice(name=job, value=job) for job in jobs[:25]]
+
     @app_commands.command(name="setjob", description="👔 Chọn công việc để kiếm tiền")
-    @app_commands.describe(job="Chọn nghề nghiệp")
-    @app_commands.choices(job=[
-        app_commands.Choice(name=job, value=job) for job in JOBS
-    ])
-    async def setjob(self, interaction: discord.Interaction, job: app_commands.Choice[str]):
+    @app_commands.describe(job="Nhập nghề muốn chọn")
+    @app_commands.autocomplete(job=job_autocomplete)
+    async def setjob(self, interaction: discord.Interaction, job: str):
         user_id = interaction.user.id
         user_data = get_user(DATA, user_id)
         now = time.time()
@@ -70,7 +73,7 @@ class SetJob(commands.Cog):
         salary = random.randint(10, 150)
 
         # Cập nhật thông tin nghề
-        user_data["job"] = job.value
+        user_data["job"] = job
         user_data["salary"] = salary
         user_data["last_setjob"] = now
         save_data()
@@ -78,7 +81,7 @@ class SetJob(commands.Cog):
         # Embed hiển thị nghề vừa chọn
         embed = discord.Embed(
             title="✅ Bạn đã chọn nghề mới!",
-            description=f"**{job.value}** 👔",
+            description=f"**{job}** 👔",
             color=discord.Color.green()
         )
         embed.add_field(name="💰 Lương mỗi lần làm việc", value=f"**{salary:,} Xu**", inline=False)
