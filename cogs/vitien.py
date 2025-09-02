@@ -17,6 +17,7 @@ class ViTien(commands.Cog):
 
         balance = user_data.get("money", 0)
         job = user_data.get("job", "Chưa có nghề")
+        baove = user_data.get("baove", 0)  # thêm số lượt bảo vệ
 
         embed = discord.Embed(
             title="💰 Ví Tiền",
@@ -25,8 +26,10 @@ class ViTien(commands.Cog):
         embed.add_field(name="👤 Chủ Ví", value=f"{user.mention}", inline=False)
         embed.add_field(name="💼 Nghề Nghiệp", value=f"**{job}**", inline=True)
         embed.add_field(name="💰 Số Dư", value=f"**{balance} Xu**", inline=True)
+        embed.add_field(name="🛡️ Bảo Vệ", value=f"**{baove} lần**", inline=True)
+
         embed.set_thumbnail(url=user.display_avatar.url)
-        embed.set_footer(text="🪙 Theo dõi số dư của bạn mọi lúc!")
+        embed.set_footer(text="🪙 Theo dõi số dư và bảo vệ của bạn mọi lúc!")
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
