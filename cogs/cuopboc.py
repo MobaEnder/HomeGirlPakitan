@@ -46,6 +46,23 @@ class CuopBoc(commands.Cog):
             embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/857/857681.png")
             return await interaction.response.send_message(embed=embed, ephemeral=True)
 
+        # --- kiểm tra bảo vệ ---
+        if target.get("baove", 0) > 0:
+            target["baove"] -= 1
+            save_data()
+
+            embed = discord.Embed(
+                title="🛡️ Cướp bị chặn!",
+                description=(
+                    f"{nguoi.mention} đã sử dụng **bảo vệ** và chặn thành công vụ cướp!\n\n"
+                    f"{interaction.user.mention} không lấy được đồng nào."
+                ),
+                color=discord.Color.blue()
+            )
+            embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/3068/3068384.png")
+            embed.add_field(name="🛡️ Lượt bảo vệ còn lại của nạn nhân", value=f"**{target['baove']} lần**", inline=False)
+            return await interaction.response.send_message(embed=embed)
+
         # đặt cooldown 1 tiếng
         COOLDOWN_CUOPBOC[user_id] = now + 3600  
 
@@ -75,6 +92,7 @@ class CuopBoc(commands.Cog):
             embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/616/616408.png")
             embed.add_field(name="📥 Số dư mới của bạn", value=f"**{thief['money']:,} xu**", inline=True)
             embed.add_field(name="📤 Số dư của nạn nhân", value=f"**{target['money']:,} xu**", inline=True)
+            embed.add_field(name="🛡️ Bảo vệ còn lại", value=f"**{target.get('baove',0)} lần**", inline=True)
             return await interaction.response.send_message(embed=embed)
 
         else:
@@ -94,6 +112,7 @@ class CuopBoc(commands.Cog):
             embed.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/190/190411.png")
             embed.add_field(name="📥 Số dư của bạn", value=f"**{thief['money']:,} xu**", inline=True)
             embed.add_field(name="📤 Số dư của mục tiêu", value=f"**{target['money']:,} xu**", inline=True)
+            embed.add_field(name="🛡️ Bảo vệ còn lại", value=f"**{target.get('baove',0)} lần**", inline=True)
             return await interaction.response.send_message(embed=embed)
 
 
