@@ -16,10 +16,25 @@ JOBS = [
     "Ca Sĩ 🎤",
     "Họa Sĩ 🎨",
     "Nghiên Cứu 🔬",
-    "Kiếm Khác ⚔️",
+    "Kiếm Khách ⚔️",
     "Wibu 📚",
     "Eodibiti 🏳️‍🌈",
     "MoiDen 👦🏿",
+
+    # 🌟 Nghề mới thêm
+    "Streamer 📺",
+    "Nông Dân 👨‍🌾",
+    "Bán Vé Số 🎫",
+    "Thợ Xây 👷",
+    "Người Giao Hàng 🚴",
+    "Bảo Vệ 🛡️",
+    "Lập Trình Viên 👨‍💻",
+    "Bác Sĩ 🏥",
+    "Kỹ Sư ⚙️",
+    "Thầy Giáo 📖",
+    "Trader 📈",
+    "Thám Tử 🕵️",
+    "Thần Tài 🪙",
 ]
 
 class SetJob(commands.Cog):
@@ -51,8 +66,8 @@ class SetJob(commands.Cog):
             embed_cd.set_thumbnail(url="https://cdn-icons-png.flaticon.com/512/1067/1067895.png")
             return await interaction.response.send_message(embed=embed_cd, ephemeral=True)
 
-        # Random lương (100 → 500)
-        salary = random.randint(100, 500)
+        # Random lương (10 → 150 Xu)
+        salary = random.randint(10, 150)
 
         # Cập nhật thông tin nghề
         user_data["job"] = job.value
