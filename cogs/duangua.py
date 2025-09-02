@@ -1,7 +1,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-import random, asyncio, time
+import random, asyncio, secrets
 
 from utils.data import get_user, save_data, DATA
 
@@ -15,12 +15,11 @@ class HorseButtons(discord.ui.View):
         for i in range(1, 8):
             self.add_item(
                 discord.ui.Button(
-                    label=str(i),
+                    label=f"🐎 Ngựa {i}",
                     style=discord.ButtonStyle.primary,
-                    custom_id=f"horse_{i}"   # 👈 set custom_id rõ ràng
+                    custom_id=f"horse_{i}"
                 )
             )
-
         for child in self.children:
             child.callback = self.button_callback
 
@@ -32,20 +31,18 @@ class HorseButtons(discord.ui.View):
             return await interaction.response.send_message("❌ Phòng đã bắt đầu!", ephemeral=True)
 
         if user_id in room["players"]:
-            return await interaction.response.send_message("❌ Bạn đã chọn rồi!", ephemeral=True)
+            return await interaction.response.send_message("❌ Bạn đã chọn ngựa rồi!", ephemeral=True)
 
-        # check tiền cược
+        # kiểm tra tiền cược
         user_data = get_user(DATA, user_id)
         if user_data["money"] < room["cuoc"]:
-            return await interaction.response.send_message("❌ Bạn không đủ tiền để tham gia!", ephemeral=True)
+            return await interaction.response.send_message("💸 Bạn không đủ tiền để tham gia!", ephemeral=True)
 
         # trừ tiền
         user_data["money"] -= room["cuoc"]
         save_data()
 
-        # ✅ lấy số ngựa từ custom_id
         horse = int(interaction.data["custom_id"].split("_")[1])
-
         room["players"][user_id] = horse
 
         await interaction.response.send_message(
@@ -61,16 +58,14 @@ class HorseButtons(discord.ui.View):
 async def start_race(interaction: discord.Interaction, room_id: str):
     room = ROOMS[room_id]
 
-    msg = await interaction.followup.send(f"🐎 Phòng {room_id} đã đủ người! Bắt đầu sau 8 giây...")
-    for i in range(8, 0, -1):
-        await msg.edit(content=f"🐎 Cuộc đua bắt đầu sau {i} giây...")
+    msg = await interaction.followup.send(f"🐎 Phòng **{room_id}** đã đủ người! Bắt đầu sau 5 giây...")
+    for i in range(5, 0, -1):
+        await msg.edit(content=f"🐎 Cuộc đua bắt đầu sau **{i}s**...")
         await asyncio.sleep(1)
 
-    # danh sách 7 ngựa
-    horse_icons = ["🏇"]
+    # danh sách ngựa
     track_length = 20
     positions = [0] * 7
-
     race_msg = await interaction.followup.send("🏁 **ĐUA NGỰA** 🏁\n")
     winner = None
 
@@ -84,8 +79,7 @@ async def start_race(interaction: discord.Interaction, room_id: str):
 
         text = "🏁 **ĐUA NGỰA** 🏁\n"
         for i in range(7):
-            icon = random.choice(horse_icons)
-            track = "·" * positions[i] + icon + "·" * (track_length - positions[i])
+            track = "·" * positions[i] + "🐎" + "·" * (track_length - positions[i])
             text += f"Ngựa {i+1}: {track}\n"
 
         await race_msg.edit(content=text)
@@ -103,11 +97,19 @@ async def start_race(interaction: discord.Interaction, room_id: str):
     else:
         result_text += "❌ Không ai đoán đúng!"
 
-    await interaction.followup.send(result_text)
+    result_msg = await interaction.followup.send(result_text)
 
     # xoá phòng
     if room_id in ROOMS:
         del ROOMS[room_id]
+
+    # tự xoá toàn bộ sau 30s
+    await asyncio.sleep(30)
+    for m in [msg, race_msg, result_msg]:
+        try:
+            await m.delete()
+        except:
+            pass
 
 
 class DuaNgua(commands.Cog):
@@ -117,7 +119,7 @@ class DuaNgua(commands.Cog):
     group = app_commands.Group(name="duangua", description="🐎 Đua ngựa")
 
     @group.command(name="taophong", description="🐎 Tạo phòng đua ngựa")
-    @app_commands.describe(so_nguoi="Số người chơi", cuoc="Số tiền cược")
+    @app_commands.describe(so_nguoi="Số người chơi (2-10)", cuoc="Số tiền cược")
     async def taophong(self, interaction: discord.Interaction, so_nguoi: int, cuoc: int):
         user_id = interaction.user.id
         user_data = get_user(DATA, user_id)
@@ -128,7 +130,8 @@ class DuaNgua(commands.Cog):
         if user_data["money"] < cuoc:
             return await interaction.response.send_message("❌ Bạn không đủ tiền để tạo phòng!", ephemeral=True)
 
-        room_id = str(int(time.time()))
+        # tạo ID phòng ngắn gọn (6 ký tự hex)
+        room_id = secrets.token_hex(3).upper()
         ROOMS[room_id] = {
             "owner": user_id,
             "so_nguoi": so_nguoi,
@@ -137,15 +140,20 @@ class DuaNgua(commands.Cog):
             "started": False
         }
 
-        # tạo view có nút chọn
         view = HorseButtons(room_id)
-        await interaction.response.send_message(
-            f"🐎 {interaction.user.mention} đã tạo phòng **{room_id}**\n"
-            f"👥 Số người: **{so_nguoi}**\n"
-            f"💰 Tiền cược: **{cuoc} xu**\n"
-            f"👉 Nhấn nút để chọn ngựa bạn muốn đặt cược!",
-            view=view
+        embed = discord.Embed(
+            title="🐎 Phòng Đua Ngựa",
+            description=(
+                f"👑 Chủ phòng: {interaction.user.mention}\n"
+                f"👥 Số người: **{so_nguoi}**\n"
+                f"💰 Tiền cược: **{cuoc} xu**\n\n"
+                f"👉 Nhấn nút để chọn ngựa bạn muốn đặt cược!"
+            ),
+            color=discord.Color.gold()
         )
+        embed.set_footer(text=f"Mã phòng: {room_id}")
+
+        await interaction.response.send_message(embed=embed, view=view)
 
 
 async def setup(bot: commands.Bot):
