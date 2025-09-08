@@ -264,6 +264,46 @@ class RivenModCog(commands.Cog):
         msg = await interaction.original_response()
         view.message = msg
 
+        @app_commands.command(name="showriven", description="Hiển thị thông số full của Riven theo ID")
+    async def showriven(self, interaction: discord.Interaction, rid: int):
+        inv = get_user_rivens(interaction.user.id) or []
+        riven = next((rv for rv in inv if rv.get("id") == rid), None)
+        if not riven:
+            return await interaction.response.send_message(
+                f"⚠️ Không tìm thấy Riven ID `{rid}` trong kho.", ephemeral=True
+            )
+        user_data = get_user(DATA, interaction.user.id)
+        emb = build_embed(riven, user_data.get("money", 0))
+        await interaction.response.send_message(embed=emb, ephemeral=True)
+
+    @app_commands.command(name="traderiven", description="Chuyển Riven cho người khác")
+    @app_commands.describe(user="Người nhận Riven")
+    async def traderiven(self, interaction: discord.Interaction, rid: int, user: discord.User):
+        if interaction.user.id == user.id:
+            return await interaction.response.send_message("⚠️ Bạn không thể chuyển Riven cho chính mình.", ephemeral=True)
+
+        inv = get_user_rivens(interaction.user.id) or []
+        riven = next((rv for rv in inv if rv.get("id") == rid), None)
+        if not riven:
+            return await interaction.response.send_message(
+                f"⚠️ Không tìm thấy Riven ID `{rid}` trong kho của bạn.", ephemeral=True
+            )
+
+        # Kiểm tra kho người nhận
+        recipient_inv = get_user_rivens(user.id) or []
+        if len(recipient_inv) >= MAX_RIVENS:
+            return await interaction.response.send_message(
+                f"⚠️ Kho của {user.mention} đã đầy!", ephemeral=True
+            )
+
+        # Chuyển riven
+        delete_riven(interaction.user.id, rid)
+        add_riven(user.id, riven)
+        save_rivens()
+        await interaction.response.send_message(
+            f"✅ Đã chuyển Riven ID `{rid}` cho {user.mention}.", ephemeral=True
+        )
+
     @app_commands.command(name="inventory", description="Xem kho Riven")
     async def inventory(self, interaction: discord.Interaction):
         inv = get_user_rivens(interaction.user.id) or []
