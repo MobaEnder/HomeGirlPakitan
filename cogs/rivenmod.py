@@ -11,7 +11,6 @@ COST_CREATE = 10000   # tạo mới
 COST_REROLL = 3500    # reroll trong preview
 MAX_RIVENS = 10
 
-# disposition ranges (dot 1-5 -> hệ số random trong khoảng)
 DISPO_RANGES = {
     5: (1.31, 1.55),
     4: (1.11, 1.30),
@@ -28,7 +27,6 @@ ICON = {
     "archgun": "💥",
 }
 
-# affix pool
 AFFIX_POOL = {
     "melee": ["Additional Combo Count Chance","Chance to not gain Combo Count","Damage vs Corpus","Damage vs Grineer","Damage vs Infested",
         "Cold","Combo Duration","Critical Chance","Critical Chance on Slide Attack","Critical Damage","Melee Damage","Electricity",
@@ -89,7 +87,6 @@ def generate_riven(slot, weapon_name, dot, user_id, mr=None, cap=None, rerolls=0
     return {
         "id": rid,
         "weapon": weapon_name,
-        "name": "(không tên)",
         "slot": slot,
         "disposition": dot,
         "mr": mr if mr is not None else random.randint(8, 16),
@@ -101,19 +98,18 @@ def generate_riven(slot, weapon_name, dot, user_id, mr=None, cap=None, rerolls=0
 def nice_val(a: dict) -> str:
     sign = "-" if a.get("negative") else "+"
     v = f"{a['value']:.2f}".rstrip("0").rstrip(".")
-    return f"{sign}{v}% {a['label']}"
+    return f"**{sign}{v}% {a['label']}**"
 
 def build_embed(riven: dict, user_money: int) -> discord.Embed:
     icon = ICON.get(riven["slot"], "💎")
     stats_text = "\n".join(nice_val(a) for a in riven["affixes"])
     desc = (
-        f"**ID:** {riven['id']}\n"
-        f"**Tên:** `{riven['name']}`\n"
+        f"**ID:** `{riven['id']}`\n"
         f"**Vũ khí:** {riven['weapon']}    **Loại:** {riven['slot'].capitalize()}\n"
         f"**Disposition:** {riven['disposition']}\n"
         f"**MR:** {riven['mr']}    **Cap:** {riven['capacity']}\n"
         f"**Rerolls:** {riven['rerolls']}\n\n"
-        f"── Stats ──\n{stats_text}"
+        f"── **Stats** ──\n{stats_text}"
     )
     emb = discord.Embed(title=f"{icon} Riven Mod (Preview)", description=desc, color=discord.Color.purple())
     emb.set_footer(text=f"💰 Số dư: {user_money:,} xu")
@@ -121,15 +117,19 @@ def build_embed(riven: dict, user_money: int) -> discord.Embed:
 
 # ===== View cho preview =====
 class RivenPreviewView(discord.ui.View):
-    def __init__(self, bot, user_id, riven, user_data):
+    def __init__(self, bot, user_id, riven, user_data, message=None):
         super().__init__(timeout=60)
         self.bot = bot
         self.user_id = user_id
         self.riven = riven
         self.user_data = user_data
+        self.message = message
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        return interaction.user.id == self.user_id
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ Đây không phải Riven của bạn!", ephemeral=True)
+            return False
+        return True
 
     @discord.ui.button(label="🔒 Lưu vào kho", style=discord.ButtonStyle.success)
     async def save_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -138,19 +138,28 @@ class RivenPreviewView(discord.ui.View):
             return await interaction.response.send_message("📦 Kho đã đầy (10)!", ephemeral=True)
         add_riven(self.user_id, self.riven)
         await interaction.response.send_message(f"✅ Đã lưu Riven ID `{self.riven['id']}` vào kho!", ephemeral=True)
+        if self.message:
+            await self.message.delete()
         self.stop()
 
     @discord.ui.button(label="🎲 Reroll (3500 xu)", style=discord.ButtonStyle.primary)
     async def reroll_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.user_data.get("money", 0) < COST_REROLL:
             return await interaction.response.send_message("💸 Bạn không đủ xu để reroll!", ephemeral=True)
-        # trừ tiền & reroll
         self.user_data["money"] -= COST_REROLL
         save_data()
         self.riven["affixes"] = _roll_affixes(self.riven["slot"], self.riven["disposition"])
         self.riven["rerolls"] += 1
         emb = build_embed(self.riven, self.user_data["money"])
         await interaction.response.edit_message(embed=emb, view=self)
+
+    async def on_timeout(self):
+        if self.message:
+            try:
+                await self.message.delete()
+            except:
+                pass
+        self.stop()
 
 # ===== Cog =====
 class RivenModCog(commands.Cog):
@@ -186,8 +195,11 @@ class RivenModCog(commands.Cog):
 
         riven = generate_riven(slot.value, weapon, dot.value, interaction.user.id)
         emb = build_embed(riven, user_data["money"])
-        view = RivenPreviewView(self.bot, interaction.user.id, riven, user_data)
-        await interaction.response.send_message(embed=emb, view=view, ephemeral=True)
+        await interaction.response.send_message(embed=emb, view=None)
+        msg = await interaction.original_response()
+
+        view = RivenPreviewView(self.bot, interaction.user.id, riven, user_data, message=msg)
+        await msg.edit(embed=emb, view=view)
 
     @app_commands.command(name="inventory", description="Xem kho Riven")
     async def inventory(self, interaction: discord.Interaction):
@@ -200,7 +212,7 @@ class RivenModCog(commands.Cog):
             icon = ICON.get(rv.get("slot"), "💎")
             stats = " • ".join(nice_val(a) for a in rv.get("affixes", []))
             emb.add_field(
-                name=f"{icon} ID {rv.get('id')} — {rv.get('name')} ({rv.get('weapon')})",
+                name=f"{icon} ID {rv.get('id')} — {rv.get('weapon')}",
                 value=f"{stats}\n🔄 Rerolls: {rv.get('rerolls', 0)}",
                 inline=False
             )
