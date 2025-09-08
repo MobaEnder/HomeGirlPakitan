@@ -34,7 +34,7 @@ AFFIX_POOL = {
         "Slash","Status Chance","Status Duration"],
     "primary": ["Ammo Maximum","Damage vs Corpus","Damage vs Grineer","Damage vs Infested","Cold","Critical Chance","Critical Damage","Damage",
         "Electricity","Heat","Fire Rate","Impact","Toxin","Puncture","Slash","Status Chance","Status Duration","Multishot","Magazine Capacity","Projectile speed",
-        "Punch Through","Reload Speed","Weapon Recoil","Zoom","Magazine Capacity","Projectile speed"],
+        "Punch Through","Reload Speed","Weapon Recoil","Zoom"],
     "secondary": ["Ammo Maximum","Damage vs Corpus","Damage vs Grineer","Damage vs Infested","Cold","Critical Chance","Critical Damage","Damage",
         "Electricity","Heat","Fire Rate","Impact","Toxin","Puncture","Slash","Status Chance","Status Duration","Multishot",
         "Punch Through","Reload Speed","Weapon Recoil","Zoom","Magazine Capacity","Projectile speed"],
