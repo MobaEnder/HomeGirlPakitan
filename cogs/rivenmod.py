@@ -201,6 +201,33 @@ class RivenModCog(commands.Cog):
         msg = await interaction.original_response()
         view.message = msg
 
+    @app_commands.command(name="reroll", description="Reroll Riven theo ID (3500 xu)")
+    async def reroll_cmd(self, interaction: discord.Interaction, rid: int):
+        user_data = get_user(DATA, interaction.user.id)
+        if user_data.get("money", 0) < COST_REROLL:
+            return await interaction.response.send_message(
+                f"💸 Cần {COST_REROLL:,} xu để reroll.", ephemeral=True
+            )
+
+        inv = get_user_rivens(interaction.user.id) or []
+        riven = next((rv for rv in inv if rv.get("id") == rid), None)
+        if not riven:
+            return await interaction.response.send_message(
+                f"⚠️ Không tìm thấy Riven ID `{rid}` trong kho.", ephemeral=True
+            )
+
+        # Trừ tiền + reroll affix
+        user_data["money"] -= COST_REROLL
+        save_data()
+        riven["affixes"] = _roll_affixes(riven["slot"], riven["disposition"])
+        riven["rerolls"] = riven.get("rerolls", 0) + 1
+        save_rivens()
+
+        emb = build_embed(riven, user_data["money"])
+        await interaction.response.send_message(
+            f"🎲 Đã reroll Riven ID `{rid}`!", embed=emb, ephemeral=True
+        )
+
     @app_commands.command(name="inventory", description="Xem kho Riven")
     async def inventory(self, interaction: discord.Interaction):
         inv = get_user_rivens(interaction.user.id) or []
