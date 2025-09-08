@@ -2,14 +2,13 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-import random, os
-
+import random
 from utils.data import get_user, DATA, save_data
 from utils.rivens import add_riven, get_user_rivens, load_rivens
 
 COST_ROLL = 3000
+MAX_RIVENS = 10
 
-# disposition ranges
 DISPO_RANGES = {
     5: (1.31, 1.55),
     4: (1.11, 1.30),
@@ -18,201 +17,170 @@ DISPO_RANGES = {
     1: (0.50, 0.69),
 }
 
-# icons per slot
 ICON = {
-    "primary": "🔫",
-    "secondary": "🎯",
-    "melee": "⚔️"
+    "primary": "🔫", "secondary": "🎯", "melee": "⚔️",
+    "companion": "🐾", "archgun": "🚀",
 }
 
-# base values (small/representative set). You can expand this map from wiki.
-BASE_VALUES = {
-    "crit_chance":      {"label":"Critical Chance",        "percent":True, "primary":149.99, "secondary":149.99, "melee":180.0},
-    "crit_damage":      {"label":"Critical Damage",        "percent":True, "primary":120.0,  "secondary":120.0,  "melee":90.0},
-    "multishot":        {"label":"Multishot",              "percent":True, "primary":90.0,   "secondary":119.7, "melee":0.0},
-    "status_chance":    {"label":"Status Chance",          "percent":True, "primary":90.0,   "secondary":90.0,  "melee":60.3},
-    "status_duration":  {"label":"Status Duration",        "percent":True, "primary":40.0,   "secondary":40.0,  "melee":40.0},
-    "fire_rate":        {"label":"Fire Rate / Attack Speed","percent":True,"primary":60.03,  "secondary":89.1,  "melee":54.9},
-    "base_damage":      {"label":"Base Damage",            "percent":True, "primary":165.0,  "secondary":164.7, "melee":164.7},
-    "puncture":         {"label":"Puncture",                "percent":True, "primary":119.97, "secondary":119.97,"melee":119.7},
-    "impact":           {"label":"Impact",                  "percent":True, "primary":119.97, "secondary":119.97,"melee":119.7},
-    "slash":            {"label":"Slash",                   "percent":True, "primary":119.97, "secondary":119.97,"melee":119.7},
-    "magazine":         {"label":"Magazine Size",           "percent":True, "primary":50.0,   "secondary":50.0,  "melee":0.0},
-    "reload_speed":     {"label":"Reload Speed",           "percent":True, "primary":50.0,   "secondary":49.45, "melee":0.0},
-    "max_ammo":         {"label":"Ammo Max",                "percent":True, "primary":49.95,  "secondary":90.0,  "melee":0.0},
-    "shot_type":        {"label":"Shot Type (Pellet Count)", "percent":False, "primary":0.0, "secondary":0.0,  "melee":0.0},
-    "status_delay":     {"label":"Status Delay",            "percent":False,"primary":0.0,    "secondary":0.0,   "melee":0.0},
-    "crit_mult":        {"label":"Critical Multiplier",     "percent":True, "primary":0.0,    "secondary":0.0,   "melee":0.0},
-    "angle":            {"label":"Spread Angle",            "percent":False,"primary":0.0,    "secondary":0.0,   "melee":0.0},
-    "zoom":             {"label":"Zoom",                    "percent":True, "primary":-50.0,  "secondary":-50.0, "melee":0.0},
-    "jump_range":       {"label":"Jump Attack Range",       "percent":False,"primary":0.0,    "secondary":0.0,   "melee":0.0},
-    "lethal_force":     {"label":"Lethal Force",            "percent":True, "primary":0.0,    "secondary":0.0,   "melee":0.0},
-    "stagger":          {"label":"Stagger",                 "percent":True, "primary":0.0,    "secondary":0.0,   "melee":0.0},
-    "wall_damage":      {"label":"Wall Damage",             "percent":True, "primary":0.0,    "secondary":0.0,   "melee":0.0},
-    "melee_range":      {"label":"Melee Range",             "percent":False,"primary":0.0,    "secondary":0.0,   "melee":1.94},
-    "block_efficiency": {"label":"Block Efficiency",        "percent":True, "primary":0.0,    "secondary":0.0,   "melee":600.0},
-    "kill_distance":    {"label":"Kill Distance",           "percent":False,"primary":0.0,    "secondary":0.0,   "melee":0.0},
-    "slide_attack":     {"label":"Slide Attack Damage",     "percent":True, "primary":0.0,    "secondary":0.0,   "melee":0.0},
-    "jump_attack":      {"label":"Jump Attack Damage",      "percent":True, "primary":0.0,    "secondary":0.0,   "melee":0.0},
-    # Các thuộc tính này có base-value không có sẵn trên wiki; giữ 0.0 để tránh chọn ngẫu nhiên
+AFFIX_POOL = {
+    "melee": [
+        "Additional Combo Count Chance", "Chance to not gain Combo Count",
+        "Damage vs Corpus", "Damage vs Grineer", "Damage vs Infested",
+        "Cold", "Combo Duration", "Critical Chance", "Critical Chance on Slide Attack",
+        "Critical Damage", "Melee Damage", "Electricity", "Heat", "Finisher Damage",
+        "Attack Speed", "Initial Combo", "Impact", "Heavy Attack Efficiency",
+        "Toxin", "Puncture", "Range", "Slash", "Status Chance", "Status Duration"
+    ],
+    "primary": [
+        "Ammo Maximum", "Damage vs Corpus", "Damage vs Grineer", "Damage vs Infested",
+        "Cold", "Critical Chance", "Critical Damage", "Damage", "Electricity", "Heat",
+        "Fire Rate", "Impact", "Toxin", "Puncture", "Slash", "Status Chance",
+        "Status Duration", "Multishot", "Punch Through", "Reload Speed",
+        "Weapon Recoil", "Zoom"
+    ],
+    "secondary": [
+        "Ammo Maximum", "Damage vs Corpus", "Damage vs Grineer", "Damage vs Infested",
+        "Cold", "Critical Chance", "Critical Damage", "Damage", "Electricity", "Heat",
+        "Fire Rate", "Impact", "Toxin", "Puncture", "Slash", "Status Chance",
+        "Status Duration", "Multishot", "Punch Through", "Reload Speed",
+        "Weapon Recoil", "Zoom"
+    ],
+    "companion": [
+        "Ammo Maximum", "Damage vs Corpus", "Damage vs Grineer", "Damage vs Infested",
+        "Cold", "Critical Chance", "Critical Damage", "Damage", "Electricity", "Heat",
+        "Fire Rate", "Impact", "Toxin", "Puncture", "Slash", "Status Chance",
+        "Status Duration", "Multishot", "Reload Speed"
+    ],
+    "archgun": [
+        "Ammo Maximum", "Damage vs Corpus", "Damage vs Grineer", "Damage vs Infested",
+        "Cold", "Critical Chance", "Critical Damage", "Damage", "Electricity", "Heat",
+        "Fire Rate", "Impact", "Toxin", "Puncture", "Slash", "Status Chance",
+        "Status Duration", "Multishot", "Punch Through", "Reload Speed",
+        "Weapon Recoil", "Zoom"
+    ],
 }
-
-SLOTS = ["primary", "secondary", "melee"]
 
 def pick_disposition_value(dot:int) -> float:
     lo, hi = DISPO_RANGES.get(dot, (0.9,1.1))
     return random.uniform(lo, hi)
 
-def generate_riven(slot: str, disposition: int, name: str):
-    """
-    Generate a riven with exactly 2 bonus stats (no malus per request).
-    Keep name as provided.
-    """
+def generate_id(existing_ids):
+    while True:
+        rid = random.randint(1000, 9999)
+        if rid not in existing_ids:
+            return rid
+
+def generate_riven(slot: str, disposition: int, name: str, mr=None, cap=None, rerolls=0, rid=None):
     dispo_val = pick_disposition_value(disposition)
-    # build pool of stats that are applicable to the slot (base > 0)
-    pool = [k for k,v in BASE_VALUES.items() if v.get(slot, 0)]
-    # if pool smaller than 2 fallback to all keys
-    if len(pool) < 2:
-        pool = list(BASE_VALUES.keys())
-    chosen = random.sample(pool, k=2)
+    pool = AFFIX_POOL.get(slot, [])
+    k = random.randint(2, 4)
+    chosen = random.sample(pool, k=k)
     affixes = []
-    for stat in chosen:
-        base = BASE_VALUES[stat][slot]
-        r = random.uniform(0.9, 1.1)
-        raw = base * r * dispo_val
+    for i, stat in enumerate(chosen):
+        value = random.uniform(5, 50) * dispo_val
+        negative = (k == 4 and i == 3)
         affixes.append({
-            "label": BASE_VALUES[stat]["label"],
-            "value": raw,
-            "percent": BASE_VALUES[stat]["percent"]
+            "label": stat, "value": round(value, 2),
+            "percent": True, "negative": negative
         })
-    # MR and capacity approximations
+    existing_ids = [r["id"] for r in get_user_rivens]
     return {
+        "id": rid or generate_id(existing_ids),
         "name": name or "(không tên)",
         "slot": slot,
         "disposition": disposition,
         "dispo_val": round(dispo_val, 3),
-        "mr": random.randint(8, 16),
-        "capacity": random.randint(8, 18),
-        "affixes": affixes
+        "mr": mr if mr is not None else random.randint(8, 16),
+        "capacity": cap if cap is not None else random.randint(8, 18),
+        "affixes": affixes,
+        "rerolls": rerolls
     }
 
-def nice_val(v: float, percent: bool) -> str:
-    # format: if percent show with %; if integer show int
-    if percent:
-        s = f"{v:.2f}" if abs(v - round(v)) > 0.001 else f"{int(round(v))}"
-        return f"+{s}%"
-    else:
-        s = f"{v:.2f}" if abs(v - round(v)) > 0.001 else f"{int(round(v))}"
-        return f"{s}"
+def nice_val(v: float, percent: bool, negative: bool) -> str:
+    s = f"{v:.1f}" if abs(v - round(v)) > 0.01 else str(int(round(v)))
+    prefix = "-" if negative else "+"
+    return f"{prefix}{s}{'%' if percent else ''}"
 
 def build_embed(riven: dict, user_money: int) -> discord.Embed:
-    """Build a compact, single-block stats embed with cute icons and balance footer"""
     icon = ICON.get(riven["slot"], "💎")
-    title = f"{icon} Riven Mod — {riven['slot'].capitalize()}"
-    # stats block: name + line per stat, but we will keep them compact (one block)
     stats_lines = []
     for a in riven["affixes"]:
-        stats_lines.append(f"{nice_val(a['value'], a['percent'])} {a['label']}")
+        stats_lines.append(f"{nice_val(a['value'], a['percent'], a['negative'])} {a['label']}")
     stats_text = "\n".join(stats_lines)
     desc = (
+        f"**ID:** {riven['id']}\n"
         f"**Tên:** `{riven['name']}`\n"
         f"**Loại:** {riven['slot'].capitalize()}    **Disposition:** {riven['disposition']} (×{riven['dispo_val']})\n"
-        f"**MR:** {riven['mr']}    **Cap:** {riven['capacity']}\n\n"
+        f"**MR:** {riven['mr']}    **Cap:** {riven['capacity']}\n"
+        f"**Rerolls:** {riven['rerolls']}\n\n"
         f"── Stats ──\n{stats_text}"
     )
-    emb = discord.Embed(title=title, description=desc, color=discord.Color.purple())
+    emb = discord.Embed(title=f"{icon} Riven Mod", description=desc, color=discord.Color.purple())
     emb.set_footer(text=f"💰 Số dư hiện tại: {user_money:,} xu")
     return emb
 
-# ----- View -----
-class RivenView(discord.ui.View):
-    def __init__(self, cog, user_id: int, riven: dict):
-        super().__init__(timeout=None)  # no auto-timeout needed
-        self.cog = cog
-        self.user_id = user_id
-        self.riven = riven
-        self.message: discord.Message | None = None
-
-    @discord.ui.button(label="💾 Giữ (Lưu)", style=discord.ButtonStyle.success)
-    async def keep(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.user_id:
-            return await interaction.response.send_message("❌ Chỉ chủ request mới thao tác được.", ephemeral=True)
-        # save riven
-        add_riven(self.user_id, self.riven)
-        inv_count = len(get_user_rivens(self.user_id))
-        # reply ephemeral & delete the bot message
-        await interaction.response.send_message(f"✅ Đã lưu Riven! Bạn hiện có **{inv_count}** Riven.", ephemeral=True)
-        # delete the original embed message to tidy channel
-        if self.message:
-            try:
-                await self.message.delete()
-            except Exception:
-                pass
-
-    @discord.ui.button(label=f"🎲 Roll lại (-{COST_ROLL:,} xu)", style=discord.ButtonStyle.primary)
-    async def reroll(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if interaction.user.id != self.user_id:
-            return await interaction.response.send_message("❌ Chỉ chủ request mới thao tác được.", ephemeral=True)
-        user_data = get_user(DATA, self.user_id)
-        if user_data.get("money", 0) < COST_ROLL:
-            return await interaction.response.send_message("💸 Bạn không đủ xu để roll lại.", ephemeral=True)
-        # deduct cost and generate new riven (keep name)
-        user_data["money"] -= COST_ROLL
-        save_data()
-        self.riven = generate_riven(self.riven["slot"], self.riven["disposition"], self.riven["name"])
-        emb = build_embed(self.riven, user_data["money"])
-        # edit original message
-        if self.message:
-            try:
-                await self.message.edit(embed=emb, view=self)
-            except Exception:
-                # fallback: send new message
-                await interaction.followup.send(embed=emb, view=self)
-        await interaction.response.send_message(f"🎲 Roll lại xong — Số dư hiện tại: **{user_data['money']:,} xu**", ephemeral=True)
-
-# ----- Cog -----
 class RivenModCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        # ensure rivens loaded
         load_rivens()
 
     @app_commands.command(name="rivenmod", description="Tạo Riven Mod (3000 xu / lần)")
-    @app_commands.choices(slot=[
-        app_commands.Choice(name="Primary", value="primary"),
-        app_commands.Choice(name="Secondary", value="secondary"),
-        app_commands.Choice(name="Melee", value="melee"),
-    ])
-    @app_commands.describe(name="Tên Riven (chuỗi)", slot="Loại (Primary/Secondary/Melee)", disposition="Disposition 1-5")
-    async def rivenmod(self, interaction: discord.Interaction, name: str, slot: app_commands.Choice[str], disposition: int):
-        # validate
+    async def rivenmod(self, interaction: discord.Interaction, name: str, slot: str, disposition: int):
         if disposition < 1 or disposition > 5:
-            return await interaction.response.send_message("⚠️ Disposition phải là số nguyên 1 → 5.", ephemeral=True)
+            return await interaction.response.send_message("⚠️ Disposition phải là số 1 → 5.", ephemeral=True)
         user_data = get_user(DATA, interaction.user.id)
         if user_data.get("money", 0) < COST_ROLL:
-            return await interaction.response.send_message(f"💸 Bạn cần ít nhất {COST_ROLL:,} xu để roll Riven.", ephemeral=True)
-
-        # deduct cost; generate riven; show embed (do NOT auto-delete)
-        user_data["money"] -= COST_ROLL
-        save_data()
-
-        riven = generate_riven(slot.value, disposition, name)
+            return await interaction.response.send_message(f"💸 Bạn cần {COST_ROLL:,} xu.", ephemeral=True)
+        if len(get_user_rivens(interaction.user.id)) >= MAX_RIVENS:
+            return await interaction.response.send_message("📦 Kho đã đầy (10). Hãy dùng `/xoariven <id>` để xoá.", ephemeral=True)
+        user_data["money"] -= COST_ROLL; save_data()
+        riven = generate_riven(slot, disposition, name)
+        add_riven(interaction.user.id, riven); save_data()
         embed = build_embed(riven, user_data["money"])
-        view = RivenView(self, interaction.user.id, riven)
-        await interaction.response.send_message(embed=embed, view=view)
-        msg = await interaction.original_response()
-        view.message = msg  # keep reference so view can edit/delete
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @app_commands.command(name="inventory", description="Xem kho Riven của bạn")
+    @app_commands.command(name="inventory", description="Xem kho Riven (tối đa 10)")
     async def inventory(self, interaction: discord.Interaction):
         inv = get_user_rivens(interaction.user.id)
         if not inv:
             return await interaction.response.send_message("📭 Kho Riven trống!", ephemeral=True)
         emb = discord.Embed(title=f"📦 Kho Riven của {interaction.user.display_name}", color=discord.Color.gold())
-        for idx, rv in enumerate(inv, start=1):
+        for rv in inv:
             icon = ICON.get(rv["slot"], "💎")
-            stats = " • ".join(f"{nice_val(a['value'], a['percent'])} {a['label']}" for a in rv["affixes"])
-            emb.add_field(name=f"{idx}. {icon} {rv['name']}", value=stats, inline=False)
+            stats = "\n".join(f"{nice_val(a['value'], a['percent'], a['negative'])} {a['label']}" for a in rv["affixes"])
+            emb.add_field(
+                name=f"[{rv['id']}] {icon} {rv['name']} | Rerolls: {rv['rerolls']}",
+                value=stats, inline=False
+            )
+        await interaction.response.send_message(embed=emb, ephemeral=True)
+
+    @app_commands.command(name="xoariven", description="Xóa Riven bằng ID")
+    async def xoariven(self, interaction: discord.Interaction, rid: int):
+        inv = get_user_rivens(interaction.user.id)
+        target = next((rv for rv in inv if rv["id"] == rid), None)
+        if not target:
+            return await interaction.response.send_message("❌ Không tìm thấy Riven ID này.", ephemeral=True)
+        inv.remove(target); save_data()
+        await interaction.response.send_message(f"🗑️ Đã xóa Riven ID {rid}.", ephemeral=True)
+
+    @app_commands.command(name="reroll", description="Reroll Riven trong kho theo ID")
+    async def reroll_cmd(self, interaction: discord.Interaction, rid: int):
+        user_data = get_user(DATA, interaction.user.id)
+        if user_data.get("money", 0) < COST_ROLL:
+            return await interaction.response.send_message("💸 Không đủ xu để reroll.", ephemeral=True)
+        inv = get_user_rivens(interaction.user.id)
+        target = next((rv for rv in inv if rv["id"] == rid), None)
+        if not target:
+            return await interaction.response.send_message("❌ Không tìm thấy Riven ID này.", ephemeral=True)
+        user_data["money"] -= COST_ROLL; save_data()
+        inv.remove(target)
+        new_riven = generate_riven(
+            target["slot"], target["disposition"], target["name"],
+            mr=target["mr"], cap=target["capacity"],
+            rerolls=target["rerolls"]+1, rid=target["id"]
+        )
+        inv.append(new_riven); save_data()
+        emb = build_embed(new_riven, user_data["money"])
         await interaction.response.send_message(embed=emb, ephemeral=True)
 
 async def setup(bot: commands.Bot):
