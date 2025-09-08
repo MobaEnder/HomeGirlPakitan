@@ -38,5 +38,20 @@ def add_riven(user_id: int, riven_obj: dict):
     RIVENS[uid].append(riven_obj)
     save_rivens()
 
+def delete_riven(user_id: int, rid: int) -> bool:
+    """
+    Xóa 1 riven theo ID. 
+    Trả về True nếu xóa thành công, False nếu không tìm thấy.
+    """
+    uid = str(user_id)
+    if uid not in RIVENS:
+        return False
+    for i, rv in enumerate(RIVENS[uid]):
+        if rv.get("id") == rid:
+            RIVENS[uid].pop(i)
+            save_rivens()
+            return True
+    return False
+
 # Load on import
 load_rivens()
