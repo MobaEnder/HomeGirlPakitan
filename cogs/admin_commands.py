@@ -4,6 +4,7 @@ from discord.ext import commands
 import os
 
 from utils.data import get_user, save_data, DATA
+from utils import rivens  # để clear inventory
 
 # Lấy danh sách ID admin từ biến môi trường (Railway Variables)
 ADMINS = [int(x) for x in os.getenv("ADMINS", "").split(",") if x]
@@ -43,11 +44,18 @@ class AdminCommands(commands.Cog):
             ephemeral=True
         )
 
-    # /resetall
-    @app_commands.command(name="resetall", description="⚠️ Xóa toàn bộ dữ liệu (Admin only)")
+    # /reset
+    @app_commands.command(name="reset", description="⚠️ Reset dữ liệu (Admin only)")
     @app_commands.check(admin_only)
-    async def resetall(self, interaction: discord.Interaction):
-        # Confirm trước khi xóa
+    @app_commands.describe(target="Chọn loại dữ liệu cần reset")
+    @app_commands.choices(
+        target=[
+            app_commands.Choice(name="Money (tiền)", value="money"),
+            app_commands.Choice(name="Inventory (Rivens)", value="inventory"),
+            app_commands.Choice(name="Tất cả", value="all"),
+        ]
+    )
+    async def reset(self, interaction: discord.Interaction, target: app_commands.Choice[str]):
         class ConfirmView(discord.ui.View):
             def __init__(self):
                 super().__init__(timeout=30)
@@ -55,9 +63,26 @@ class AdminCommands(commands.Cog):
             @discord.ui.button(label="✅ Đồng ý", style=discord.ButtonStyle.danger)
             async def confirm(self, interaction_btn: discord.Interaction, button: discord.ui.Button):
                 global DATA
-                DATA.clear()
-                save_data()
-                await interaction_btn.response.edit_message(content="🔥 Đã reset toàn bộ dữ liệu!", view=None)
+                if target.value == "money":
+                    # reset toàn bộ tiền về 0
+                    for uid, user_data in DATA.items():
+                        user_data["money"] = 0
+                    save_data()
+                    msg = "🔥 Đã reset toàn bộ **tiền** về 0!"
+                elif target.value == "inventory":
+                    # reset toàn bộ rivens
+                    rivens.DATA_RIVENS.clear()
+                    rivens.save_rivens()
+                    msg = "🔥 Đã xoá toàn bộ **inventory Riven**!"
+                elif target.value == "all":
+                    DATA.clear()
+                    save_data()
+                    rivens.DATA_RIVENS.clear()
+                    rivens.save_rivens()
+                    msg = "🔥 Đã reset toàn bộ dữ liệu (money + inventory)!"
+                else:
+                    msg = "⚠️ Lựa chọn không hợp lệ."
+                await interaction_btn.response.edit_message(content=msg, view=None)
 
             @discord.ui.button(label="❌ Hủy", style=discord.ButtonStyle.secondary)
             async def cancel(self, interaction_btn: discord.Interaction, button: discord.ui.Button):
@@ -65,7 +90,7 @@ class AdminCommands(commands.Cog):
 
         view = ConfirmView()
         await interaction.response.send_message(
-            "⚠️ Bạn có chắc muốn **reset toàn bộ dữ liệu**? Hành động này không thể hoàn tác!",
+            f"⚠️ Bạn có chắc muốn reset dữ liệu **{target.name}**?",
             view=view,
             ephemeral=True
         )
