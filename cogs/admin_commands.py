@@ -4,7 +4,7 @@ from discord.ext import commands
 import os
 
 from utils.data import get_user, save_data, DATA
-from utils import rivens  # để clear inventory
+import utils.rivens as rivens
 
 # Lấy danh sách ID admin từ biến môi trường (Railway Variables)
 ADMINS = [int(x) for x in os.getenv("ADMINS", "").split(",") if x]
@@ -44,54 +44,47 @@ class AdminCommands(commands.Cog):
             ephemeral=True
         )
 
-    # /reset
-    @app_commands.command(name="reset", description="⚠️ Reset dữ liệu (Admin only)")
+    # /resetall
+    @app_commands.command(name="resetall", description="⚠️ Reset dữ liệu (Admin only)")
     @app_commands.check(admin_only)
-    @app_commands.describe(target="Chọn loại dữ liệu cần reset")
-    @app_commands.choices(
-        target=[
-            app_commands.Choice(name="Money (tiền)", value="money"),
-            app_commands.Choice(name="Inventory (Rivens)", value="inventory"),
-            app_commands.Choice(name="Tất cả", value="all"),
-        ]
-    )
-    async def reset(self, interaction: discord.Interaction, target: app_commands.Choice[str]):
+    async def resetall(self, interaction: discord.Interaction):
+        class ResetType(discord.ui.Select):
+            def __init__(self):
+                options = [
+                    discord.SelectOption(label="💸 Money", value="money", description="Reset toàn bộ tiền của người chơi"),
+                    discord.SelectOption(label="🎴 Inventory Riven", value="inventory", description="Xoá toàn bộ Riven mod"),
+                    discord.SelectOption(label="🔥 ALL", value="all", description="Reset cả money và Riven"),
+                ]
+                super().__init__(placeholder="Chọn loại dữ liệu cần reset...", options=options, min_values=1, max_values=1)
+
+            async def callback(self, interaction_select: discord.Interaction):
+                value = self.values[0]
+
+                if value == "money":
+                    DATA.clear()
+                    save_data()
+                    msg = "💸 Đã reset toàn bộ **money**!"
+                elif value == "inventory":
+                    rivens.RIVENS.clear()
+                    rivens.save_rivens()
+                    msg = "🎴 Đã xoá toàn bộ **inventory Riven**!"
+                else:  # all
+                    DATA.clear()
+                    save_data()
+                    rivens.RIVENS.clear()
+                    rivens.save_rivens()
+                    msg = "🔥 Đã reset toàn bộ dữ liệu (**money + inventory**)!"
+
+                await interaction_select.response.edit_message(content=msg, view=None)
+
         class ConfirmView(discord.ui.View):
             def __init__(self):
                 super().__init__(timeout=30)
+                self.add_item(ResetType())
 
-            @discord.ui.button(label="✅ Đồng ý", style=discord.ButtonStyle.danger)
-            async def confirm(self, interaction_btn: discord.Interaction, button: discord.ui.Button):
-                global DATA
-                if target.value == "money":
-                    # reset toàn bộ tiền về 0
-                    for uid, user_data in DATA.items():
-                        user_data["money"] = 0
-                    save_data()
-                    msg = "🔥 Đã reset toàn bộ **tiền** về 0!"
-                elif target.value == "inventory":
-                    # reset toàn bộ rivens
-                    rivens.DATA_RIVENS.clear()
-                    rivens.save_rivens()
-                    msg = "🔥 Đã xoá toàn bộ **inventory Riven**!"
-                elif target.value == "all":
-                    DATA.clear()
-                    save_data()
-                    rivens.DATA_RIVENS.clear()
-                    rivens.save_rivens()
-                    msg = "🔥 Đã reset toàn bộ dữ liệu (money + inventory)!"
-                else:
-                    msg = "⚠️ Lựa chọn không hợp lệ."
-                await interaction_btn.response.edit_message(content=msg, view=None)
-
-            @discord.ui.button(label="❌ Hủy", style=discord.ButtonStyle.secondary)
-            async def cancel(self, interaction_btn: discord.Interaction, button: discord.ui.Button):
-                await interaction_btn.response.edit_message(content="❌ Đã hủy reset.", view=None)
-
-        view = ConfirmView()
         await interaction.response.send_message(
-            f"⚠️ Bạn có chắc muốn reset dữ liệu **{target.name}**?",
-            view=view,
+            "⚠️ Chọn loại dữ liệu bạn muốn **reset**:",
+            view=ConfirmView(),
             ephemeral=True
         )
 
