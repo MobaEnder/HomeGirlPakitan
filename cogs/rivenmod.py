@@ -161,6 +161,51 @@ class RivenPreviewView(discord.ui.View):
                 pass
         self.stop()
 
+# ===== View cho reroll với Giữ / Reroll =====
+class RivenRerollView(discord.ui.View):
+    def __init__(self, bot, user_id, riven, user_data, message=None):
+        super().__init__(timeout=60)
+        self.bot = bot
+        self.user_id = user_id
+        self.riven = riven
+        self.user_data = user_data
+        self.message = message
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ Đây không phải Riven của bạn!", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="💾 Giữ Riven", style=discord.ButtonStyle.success)
+    async def keep_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.send_message(f"✅ Đã giữ Riven ID `{self.riven['id']}`.", ephemeral=True)
+        if self.message:
+            try:
+                await self.message.delete()
+            except: pass
+        self.stop()
+
+    @discord.ui.button(label="🎲 Reroll (3500 xu)", style=discord.ButtonStyle.primary)
+    async def reroll_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.user_data.get("money", 0) < COST_REROLL:
+            return await interaction.response.send_message("💸 Bạn không đủ xu để reroll!", ephemeral=True)
+        self.user_data["money"] -= COST_REROLL
+        save_data()
+        self.riven["affixes"] = _roll_affixes(self.riven["slot"], self.riven["disposition"])
+        self.riven["rerolls"] = self.riven.get("rerolls", 0) + 1
+        save_rivens()
+        emb = build_embed(self.riven, self.user_data["money"])
+        await interaction.response.edit_message(embed=emb, view=self)
+
+    async def on_timeout(self):
+        if self.message:
+            try:
+                await self.message.delete()
+            except:
+                pass
+        self.stop()
+
 # ===== Cog =====
 class RivenModCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -204,11 +249,6 @@ class RivenModCog(commands.Cog):
     @app_commands.command(name="reroll", description="Reroll Riven theo ID (3500 xu)")
     async def reroll_cmd(self, interaction: discord.Interaction, rid: int):
         user_data = get_user(DATA, interaction.user.id)
-        if user_data.get("money", 0) < COST_REROLL:
-            return await interaction.response.send_message(
-                f"💸 Cần {COST_REROLL:,} xu để reroll.", ephemeral=True
-            )
-
         inv = get_user_rivens(interaction.user.id) or []
         riven = next((rv for rv in inv if rv.get("id") == rid), None)
         if not riven:
@@ -216,17 +256,13 @@ class RivenModCog(commands.Cog):
                 f"⚠️ Không tìm thấy Riven ID `{rid}` trong kho.", ephemeral=True
             )
 
-        # Trừ tiền + reroll affix
-        user_data["money"] -= COST_REROLL
-        save_data()
-        riven["affixes"] = _roll_affixes(riven["slot"], riven["disposition"])
-        riven["rerolls"] = riven.get("rerolls", 0) + 1
-        save_rivens()
-
-        emb = build_embed(riven, user_data["money"])
+        emb = build_embed(riven, user_data.get("money", 0))
+        view = RivenRerollView(self.bot, interaction.user.id, riven, user_data)
         await interaction.response.send_message(
-            f"🎲 Đã reroll Riven ID `{rid}`!", embed=emb, ephemeral=True
+            f"🔄 Preview Riven ID `{rid}` trước khi reroll:", embed=emb, view=view, ephemeral=True
         )
+        msg = await interaction.original_response()
+        view.message = msg
 
     @app_commands.command(name="inventory", description="Xem kho Riven")
     async def inventory(self, interaction: discord.Interaction):
