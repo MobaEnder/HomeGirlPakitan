@@ -2,4 +2,3 @@ discord.py
 pymongo
 motor
 python-dotenv
-pip install pillow
