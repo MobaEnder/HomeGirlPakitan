@@ -195,11 +195,11 @@ class RivenModCog(commands.Cog):
 
         riven = generate_riven(slot.value, weapon, dot.value, interaction.user.id)
         emb = build_embed(riven, user_data["money"])
-        await interaction.response.send_message(embed=emb, view=None)
-        msg = await interaction.original_response()
+        view = RivenPreviewView(self.bot, interaction.user.id, riven, user_data)
 
-        view = RivenPreviewView(self.bot, interaction.user.id, riven, user_data, message=msg)
-        await msg.edit(embed=emb, view=view)
+        await interaction.response.send_message(embed=emb, view=view)
+        msg = await interaction.original_response()
+        view.message = msg
 
     @app_commands.command(name="inventory", description="Xem kho Riven")
     async def inventory(self, interaction: discord.Interaction):
