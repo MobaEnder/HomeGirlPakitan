@@ -298,7 +298,7 @@ class RivenModCog(commands.Cog):
             )
         user_data = get_user(DATA, interaction.user.id)
         emb = build_embed(riven, user_data.get("money", 0))
-        await interaction.response.send_message(embed=emb, ephemeral=True)
+        await interaction.response.send_message(embed=emb)
 
     @app_commands.command(name="traderiven", description="Chuyển Riven cho người khác")
     @app_commands.describe(user="Người nhận Riven")
