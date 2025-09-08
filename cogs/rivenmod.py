@@ -27,7 +27,7 @@ ICON = {
     "archgun": "💥",
 }
 
-# affix pool theo slot
+# affix pool theo slot (theo bạn cung cấp)
 AFFIX_POOL = {
     "melee": [
         "Additional Combo Count Chance","Chance to not gain Combo Count","Damage vs Corpus","Damage vs Grineer","Damage vs Infested",
@@ -61,7 +61,15 @@ def pick_disposition_value(dot: int) -> float:
     lo, hi = DISPO_RANGES.get(dot, (0.9, 1.1))
     return round(random.uniform(lo, hi), 2)
 
-def generate_id(existing_ids: list[int]) -> int:
+def generate_id(existing_ids=None) -> int:
+    """
+    Tạo ID 4 chữ số không trùng. existing_ids có thể là set/list/None.
+    """
+    if existing_ids is None:
+        existing_ids = set()
+    else:
+        # đảm bảo là set các int hợp lệ
+        existing_ids = set(x for x in existing_ids if isinstance(x, int))
     while True:
         rid = random.randint(1000, 9999)
         if rid not in existing_ids:
@@ -69,23 +77,20 @@ def generate_id(existing_ids: list[int]) -> int:
 
 def _roll_affixes(slot: str, dot: int) -> list[dict]:
     """
-    Random 2-4 affix. Nếu có 4 affix thì affix thứ 4 bắt buộc là dòng âm.
-    Giá trị được scale theo dot thông qua pick_disposition_value(dot).
+    Random 2-4 affix. Nếu có 4 affix thì affix thứ 4 bắt buộc là malus.
     """
-    pool = AFFIX_POOL.get(slot, [])
+    pool = AFFIX_POOL.get(slot)
     if not pool:
-        raise ValueError(f"Không có affix cho slot '{slot}'")
-
+        raise ValueError(f"Không có affix cho slot '{slot}'. Hãy thêm vào AFFIX_POOL.")
     k = random.randint(2, 4)
     if k > len(pool):
         k = len(pool)
     chosen = random.sample(pool, k=k)
-
     dispo_val = pick_disposition_value(dot)
     affixes = []
     for i, stat in enumerate(chosen):
         value = round(random.uniform(5, 50) * dispo_val, 2)
-        negative = (k == 4 and i == 3)  # dòng thứ 4 là malus
+        negative = (k == 4 and i == 3)
         affixes.append({
             "label": stat,
             "value": value,
@@ -95,15 +100,20 @@ def _roll_affixes(slot: str, dot: int) -> list[dict]:
     return affixes
 
 def generate_riven(slot, weapon_name, name, dot, user_id, mr=None, cap=None, rerolls=0, rid=None):
-    inv = get_user_rivens(user_id)
-    rid = rid or generate_id([r["id"] for r in inv])
+    """
+    Tạo riven mới, an toàn với dữ liệu inventory có format khác.
+    """
+    inv = get_user_rivens(user_id) or []
+    # Lấy tập ID hợp lệ từ inventory (bảo vệ nếu có item lỗi)
+    existing_ids = { r.get("id") for r in inv if isinstance(r, dict) and isinstance(r.get("id"), int) }
+    rid = rid if rid is not None else generate_id(existing_ids)
     affixes = _roll_affixes(slot, dot)
     return {
         "id": rid,
         "weapon": weapon_name,
         "name": name or "(không tên)",
         "slot": slot,
-        "disposition": dot,  # lưu dot 1-5
+        "disposition": dot,
         "mr": mr if mr is not None else random.randint(8, 16),
         "capacity": cap if cap is not None else random.randint(8, 18),
         "affixes": affixes,
@@ -111,20 +121,25 @@ def generate_riven(slot, weapon_name, name, dot, user_id, mr=None, cap=None, rer
     }
 
 def nice_val(a: dict) -> str:
-    sign = "-" if a.get("negative") else "+"
-    v = f"{a['value']:.2f}".rstrip("0").rstrip(".")
-    return f"{sign}{v}% {a['label']}"
+    try:
+        sign = "-" if a.get("negative") else "+"
+        v = f"{a['value']:.2f}".rstrip("0").rstrip(".")
+        return f"{sign}{v}% {a['label']}"
+    except Exception:
+        # phòng hờ dữ liệu affix không đầy đủ
+        label = a.get("label", "<unknown>")
+        return f"{label}"
 
 def build_embed(riven: dict, user_money: int) -> discord.Embed:
-    icon = ICON.get(riven["slot"], "💎")
-    stats_text = "\n".join(nice_val(a) for a in riven["affixes"])
+    icon = ICON.get(riven.get("slot"), "💎")
+    stats_text = "\n".join(nice_val(a) for a in riven.get("affixes", []))
     desc = (
-        f"**ID:** {riven['id']}\n"
-        f"**Tên:** `{riven['name']}`\n"
-        f"**Vũ khí:** {riven['weapon']}    **Loại:** {riven['slot'].capitalize()}\n"
-        f"**Disposition:** {riven['disposition']}\n"
-        f"**MR:** {riven['mr']}    **Cap:** {riven['capacity']}\n"
-        f"**Rerolls:** {riven['rerolls']}\n\n"
+        f"**ID:** {riven.get('id')}\n"
+        f"**Tên:** `{riven.get('name')}`\n"
+        f"**Vũ khí:** {riven.get('weapon')}    **Loại:** {riven.get('slot', '').capitalize()}\n"
+        f"**Disposition:** {riven.get('disposition')}\n"
+        f"**MR:** {riven.get('mr')}    **Cap:** {riven.get('capacity')}\n"
+        f"**Rerolls:** {riven.get('rerolls', 0)}\n\n"
         f"── Stats ──\n{stats_text}"
     )
     emb = discord.Embed(title=f"{icon} Riven Mod", description=desc, color=discord.Color.purple())
@@ -160,7 +175,7 @@ class RivenModCog(commands.Cog):
         if user_data.get("money", 0) < COST_ROLL:
             return await interaction.response.send_message(f"💸 Cần {COST_ROLL:,} xu.", ephemeral=True)
 
-        inv = get_user_rivens(interaction.user.id)
+        inv = get_user_rivens(interaction.user.id) or []
         if len(inv) >= MAX_RIVENS:
             return await interaction.response.send_message("📦 Kho đã đầy (10). Hãy xoá bớt bằng `/xoariven <id>`.", ephemeral=True)
 
@@ -169,25 +184,30 @@ class RivenModCog(commands.Cog):
         save_data()
 
         # tạo riven
-        riven = generate_riven(slot.value, weapon, name, dot.value, interaction.user.id)
-        add_riven(interaction.user.id, riven)  # save_rivens() đã được gọi bên trong add nếu bạn cài vậy, an toàn thêm save_rivens() cũng được
+        try:
+            riven = generate_riven(slot.value, weapon, name, dot.value, interaction.user.id)
+        except Exception as e:
+            # lỗi do pool/affix thiếu
+            return await interaction.response.send_message(f"❌ Lỗi khi tạo riven: {e}", ephemeral=True)
+
+        add_riven(interaction.user.id, riven)
 
         emb = build_embed(riven, user_data["money"])
         await interaction.response.send_message(embed=emb)
 
     @app_commands.command(name="inventory", description="Xem kho Riven của bạn (tối đa 10)")
     async def inventory(self, interaction: discord.Interaction):
-        inv = get_user_rivens(interaction.user.id)
+        inv = get_user_rivens(interaction.user.id) or []
         if not inv:
             return await interaction.response.send_message("📭 Kho Riven trống!", ephemeral=True)
 
         emb = discord.Embed(title=f"📦 Kho Riven của {interaction.user.display_name} ({len(inv)}/{MAX_RIVENS})", color=discord.Color.gold())
         for rv in inv:
-            icon = ICON.get(rv["slot"], "💎")
-            stats = " • ".join(nice_val(a) for a in rv["affixes"])
+            icon = ICON.get(rv.get("slot"), "💎")
+            stats = " • ".join(nice_val(a) for a in rv.get("affixes", []))
             emb.add_field(
-                name=f"{icon} ID {rv['id']} — {rv['name']} ({rv['weapon']})",
-                value=f"{stats}\n🔄 Rerolls: {rv['rerolls']}",
+                name=f"{icon} ID {rv.get('id')} — {rv.get('name')} ({rv.get('weapon')})",
+                value=f"{stats}\n🔄 Rerolls: {rv.get('rerolls', 0)}",
                 inline=False
             )
         await interaction.response.send_message(embed=emb, ephemeral=True)
@@ -205,8 +225,8 @@ class RivenModCog(commands.Cog):
         if user_data.get("money", 0) < COST_ROLL:
             return await interaction.response.send_message("💸 Bạn không đủ xu để reroll.", ephemeral=True)
 
-        inv = get_user_rivens(interaction.user.id)
-        target = next((rv for rv in inv if rv.get("id") == rid), None)
+        inv = get_user_rivens(interaction.user.id) or []
+        target = next((rv for rv in inv if isinstance(rv, dict) and rv.get("id") == rid), None)
         if not target:
             return await interaction.response.send_message(f"❌ Không tìm thấy Riven với ID `{rid}`.", ephemeral=True)
 
@@ -214,8 +234,12 @@ class RivenModCog(commands.Cog):
         user_data["money"] -= COST_ROLL
         save_data()
 
-        # reroll: GIỮ MR, Cap, Slot, Dot, ID — random lại affixes, tăng rerolls
-        target["affixes"] = _roll_affixes(target["slot"], target["disposition"])
+        # reroll: giữ MR, Cap, Slot, Dot, ID — random lại affixes, tăng rerolls
+        try:
+            target["affixes"] = _roll_affixes(target.get("slot"), target.get("disposition"))
+        except Exception as e:
+            return await interaction.response.send_message(f"❌ Lỗi khi roll: {e}", ephemeral=True)
+
         target["rerolls"] = target.get("rerolls", 0) + 1
         save_rivens()
 
