@@ -33,16 +33,16 @@ AFFIX_POOL = {
         "Heat","Finisher Damage","Attack Speed","Initial Combo","Impact","Heavy Attack Efficiency","Toxin","Puncture","Range",
         "Slash","Status Chance","Status Duration"],
     "primary": ["Ammo Maximum","Damage vs Corpus","Damage vs Grineer","Damage vs Infested","Cold","Critical Chance","Critical Damage","Damage",
-        "Electricity","Heat","Fire Rate","Impact","Toxin","Puncture","Slash","Status Chance","Status Duration","Multishot",
-        "Punch Through","Reload Speed","Weapon Recoil","Zoom"],
+        "Electricity","Heat","Fire Rate","Impact","Toxin","Puncture","Slash","Status Chance","Status Duration","Multishot","Magazine Capacity","Projectile speed",
+        "Punch Through","Reload Speed","Weapon Recoil","Zoom","Magazine Capacity","Projectile speed"],
     "secondary": ["Ammo Maximum","Damage vs Corpus","Damage vs Grineer","Damage vs Infested","Cold","Critical Chance","Critical Damage","Damage",
         "Electricity","Heat","Fire Rate","Impact","Toxin","Puncture","Slash","Status Chance","Status Duration","Multishot",
-        "Punch Through","Reload Speed","Weapon Recoil","Zoom"],
+        "Punch Through","Reload Speed","Weapon Recoil","Zoom","Magazine Capacity","Projectile speed"],
     "companion": ["Ammo Maximum","Damage vs Corpus","Damage vs Grineer","Damage vs Infested","Cold","Critical Chance","Critical Damage","Damage",
-        "Electricity","Heat","Fire Rate","Impact","Toxin","Puncture","Slash","Status Chance","Status Duration","Multishot","Reload Speed"],
+        "Electricity","Heat","Fire Rate","Impact","Toxin","Puncture","Slash","Status Chance","Status Duration","Multishot","Reload Speed","Magazine Capacity"],
     "archgun": ["Ammo Maximum","Damage vs Corpus","Damage vs Grineer","Damage vs Infested","Cold","Critical Chance","Critical Damage","Damage",
-        "Electricity","Heat","Fire Rate","Impact","Toxin","Puncture","Slash","Status Chance","Status Duration","Multishot",
-        "Punch Through","Reload Speed","Weapon Recoil","Zoom"]
+        "Electricity","Heat","Fire Rate","Impact","Toxin","Puncture","Status Chance","Status Duration","Multishot",
+        "Reload Speed","Weapon Recoil","Zoom","Magazine Capacity"]
 }
 
 # ===== Helpers =====
@@ -223,11 +223,11 @@ class RivenModCog(commands.Cog):
             app_commands.Choice(name="Archgun", value="archgun"),
         ],
         dot=[
-            app_commands.Choice(name="1 (Yếu nhất)", value=1),
+            app_commands.Choice(name="1", value=1),
             app_commands.Choice(name="2", value=2),
             app_commands.Choice(name="3", value=3),
             app_commands.Choice(name="4", value=4),
-            app_commands.Choice(name="5 (Mạnh nhất)", value=5),
+            app_commands.Choice(name="5", value=5),
         ]
     )
     async def rivenmod(self, interaction: discord.Interaction, weapon: str, slot: app_commands.Choice[str], dot: app_commands.Choice[int]):
