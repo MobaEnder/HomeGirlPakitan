@@ -30,10 +30,10 @@ class CuaBom(commands.Cog):
             title="💣 Cưa Bom - Bắt Đầu!",
             description=(
                 f"💼 Bạn cược **{bet:,} xu**\n\n"
-                f"🔹 Lần 1: 100% thắng → ×1.5\n"
-                f"🔹 Lần 2: 80% thắng → ×1.25\n"
-                f"🔹 Lần 3: 50% thắng → ×1.25\n"
-                f"🔹 Lần 4+: 40% thắng → ×1.25\n\n"
+                f"🔹 Lần 1: 100% thắng → ×2\n"
+                f"🔹 Lần 2: 80% thắng → ×1.75\n"
+                f"🔹 Lần 3: 50% thắng → ×1.75\n"
+                f"🔹 Lần 4+: 40% thắng → ×1.75\n\n"
                 f"⚠️ Chỉ được dừng ngay **lần đầu** (cảnh báo) hoặc từ **lần 4** trở đi!"
             ),
             color=discord.Color.orange()
@@ -52,18 +52,18 @@ class CuaBom(commands.Cog):
                 if self.round == 1:
                     return 1.0
                 elif self.round == 2:
-                    return 0.8
+                    return 0.7
                 elif self.round == 3:
-                    return 0.4
+                    return 0.5
                 else:
                     return 0.4
 
             def next_reward(self):
                 """Tính tiền vòng tiếp theo"""
                 if self.round == 1:
-                    return self.current_money * 1.5
+                    return self.current_money * 2
                 else:
-                    return int(self.current_money * 1.25)
+                    return int(self.current_money * 1.75)
 
             async def end_game(self, embed: discord.Embed):
                 embed.set_footer(text="⏳ Tin nhắn sẽ tự xóa sau 30 giây.")
