@@ -41,7 +41,7 @@ AFFIX_POOL = {
     "companion": ["Ammo Maximum","Damage vs Corpus","Damage vs Grineer","Damage vs Infested","Cold","Critical Chance","Critical Damage","Damage",
         "Electricity","Heat","Fire Rate","Impact","Toxin","Puncture","Slash","Status Chance","Status Duration","Multishot","Reload Speed","Magazine Capacity"],
     "archgun": ["Ammo Maximum","Damage vs Corpus","Damage vs Grineer","Damage vs Infested","Cold","Critical Chance","Critical Damage","Damage",
-        "Electricity","Heat","Fire Rate","Impact","Toxin","Puncture","Status Chance","Status Duration","Multishot",
+        "Electricity","Heat","Fire Rate","Toxin","Status Chance","Status Duration","Multishot",
         "Reload Speed","Weapon Recoil","Zoom","Magazine Capacity"]
 }
 
